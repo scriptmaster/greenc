@@ -1,4 +1,4 @@
-greenc is valid c language with -nostdlib -fno-builtin -ffreestanding 
+greenc is valid, modern, safe c language with `-nostdlib -fno-builtin -ffreestanding` flags and a built-in safe lib.
 
 All functions are available in libgreenc.h
 
