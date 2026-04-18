@@ -77,4 +77,42 @@ static inline char* greenc_itoa(int value) {
     return greenc_concat(&buf[i + 1]);
 }
 
+
+
+static inline int string_endswith(const char* s, const char* suffix) {
+    if (!s || !suffix) return 0;
+
+    int slen = greenc_strlen(s);
+    int tlen = greenc_strlen(suffix);
+
+    if (tlen > slen) return 0;
+
+    int start = slen - tlen;
+
+    for (int i = 0; i < tlen; i++) {
+        if (s[start + i] != suffix[i])
+            return 0;
+    }
+
+    return 1;
+}
+
+static inline int string_startswith(const char* s, const char* prefix) {
+    if (!s || !prefix) return 0;
+
+    int slen = greenc_strlen(s);
+    int tlen = greenc_strlen(prefix);
+
+    if (tlen > slen) return 0;
+
+    // int end = slen - tlen;
+
+    for (int i = 0; i < tlen; i++) {
+        if (s[i] != prefix[i])
+            return 0;
+    }
+
+    return 1;
+}
+
 #endif

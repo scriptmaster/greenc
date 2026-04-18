@@ -2,6 +2,11 @@
 
 #define VERSION "v1.0.5"
 
+
+static int filter_c_files(const char* name) {
+    return string_endswith(name, ".c") || string_endswith(name, ".h");
+}
+
 int gc_main() {
     int result = 1;
     print("green c (" VERSION ")\n");
@@ -30,6 +35,16 @@ int gc_main() {
     } else {
         print("file not found");
     }
+
+    string_list files = gc_files_collect_filter(cwd, filter_c_files);
+
+    for (int i = 0; i < files.count; i++) {
+        sys_println(files.items[i]);
+    }
+
+    gc_string_list_free(&files);
+
+    print("done.");
 
     return 0;
 }

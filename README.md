@@ -17,3 +17,8 @@ Macro based C compiler with built-in borrow checker
 Produces tiny binaries (< 30 KB) with Clean C code, that is readable and maintainable.
 
 Compiles to C (no IR, LLVM), uses gcc or clang or cl.exe
+
+
+Two worded types are heap allocated, otherwise stack allocated.
+
+string list files = gc_list_files(cwd);
