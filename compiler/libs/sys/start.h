@@ -41,13 +41,13 @@ static inline __attribute__((noreturn)) void sys_exit(int code) {
 // ----------------------------
 // forward declaration
 // ----------------------------
-int gc_main();
+int greenc_main();
 
 // ----------------------------
 // entry point (_start)
 // ----------------------------
 __attribute__((noreturn)) void _start() {
-    int ret = gc_main();
+    int ret = greenc_main();
     sys_exit(ret);
 }
 
@@ -56,6 +56,6 @@ __attribute__((noreturn)) void _start() {
 
 #ifndef _WIN32
 int main() {
-    return gc_main();
+    return greenc_main();
 }
 #endif

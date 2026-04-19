@@ -4,7 +4,7 @@ CC=gcc
 OPT=-Os
 CSTD=-std=c17
 CFLAGS=$(OPT) $(CSTD) -nostdlib -static-libgcc -ffreestanding -fno-builtin
-WINFLAGS=-lshell32 -lkernel32 -luser32 -Wl,-egc_main
+WINFLAGS=-lshell32 -lkernel32 -luser32 -Wl,-egreenc_main
 INCLUDES=./libs/
 
 build:

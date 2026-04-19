@@ -6,18 +6,18 @@
 #include "path.h"
 #include "listdir.h"
 
-typedef int (*gc_file_filter)(const char* name);
+typedef int (*greenc_file_filter)(const char* name);
 
 // ----------------------------
 // string_list helpers
 // ----------------------------
-static inline void gc_string_list_init(string_list* list) {
+static inline void greenc_string_list_init(string_list* list) {
     list->count = 0;
     list->cap = 16;
     list->items = (char**)greenc_malloc(sizeof(char*) * list->cap);
 }
 
-static inline void gc_string_list_push(string_list* list, char* path) {
+static inline void greenc_string_list_push(string_list* list, char* path) {
 
     if (list->count >= list->cap) {
         int new_cap = list->cap * 2;
@@ -39,7 +39,7 @@ static inline void gc_string_list_push(string_list* list, char* path) {
     list->items[list->count++] = path;
 }
 
-static inline void gc_string_list_free(string_list* list) {
+static inline void greenc_string_list_free(string_list* list) {
     for (int i = 0; i < list->count; i++)
         greenc_free(list->items[i]);
 
@@ -49,24 +49,24 @@ static inline void gc_string_list_free(string_list* list) {
 // ----------------------------
 // internal recursion
 // ----------------------------
-static void gc_files_list_internal(
+static void greenc_files_list_internal(
     const char* path,
     string_list* list,
-    gc_file_filter filter
+    greenc_file_filter filter
 ) {
-    gc_dirent* entries =
-        (gc_dirent*)greenc_malloc(sizeof(gc_dirent) * 128);
+    greenc_dirent* entries =
+        (greenc_dirent*)greenc_malloc(sizeof(greenc_dirent) * 128);
 
     if (!entries) return;
 
-    int count = gc_listdir(path, entries, 128);
+    int count = greenc_listdir(path, entries, 128);
 
     for (int i = 0; i < count; i++) {
 
-        char* full = gc_path_join(path, entries[i].name);
+        char* full = greenc_path_join(path, entries[i].name);
 
         if (entries[i].is_dir) {
-            gc_files_list_internal(full, list, filter);
+            greenc_files_list_internal(full, list, filter);
             greenc_free(full);
         } else {
 
@@ -75,7 +75,7 @@ static void gc_files_list_internal(
                 continue;
             }
 
-            gc_string_list_push(list, full);
+            greenc_string_list_push(list, full);
         }
     }
 
@@ -85,25 +85,25 @@ static void gc_files_list_internal(
 // ----------------------------
 // public API
 // ----------------------------
-static inline string_list gc_files_collect_filter(
+static inline string_list greenc_files_collect_filter(
     const char* root,
-    gc_file_filter filter
+    greenc_file_filter filter
 ) {
     string_list list;
-    gc_string_list_init(&list);
+    greenc_string_list_init(&list);
 
-    gc_files_list_internal(root, &list, filter);
+    greenc_files_list_internal(root, &list, filter);
 
     return list;
 }
 
-static inline string_list gc_files_collect(
+static inline string_list greenc_files_collect(
     const char* root
 ) {
     string_list list;
-    gc_string_list_init(&list);
+    greenc_string_list_init(&list);
 
-    gc_files_list_internal(root, &list, NULL);
+    greenc_files_list_internal(root, &list, NULL);
 
     return list;
 }

@@ -8,9 +8,9 @@
 typedef struct {
     char name[256];
     int is_dir;
-} gc_dirent;
+} greenc_dirent;
 
-static inline int gc_listdir(const char* path, gc_dirent* out, int max) {
+static inline int greenc_listdir(const char* path, greenc_dirent* out, int max) {
     WIN32_FIND_DATAA data;
     char search[512];
 
@@ -63,7 +63,7 @@ static inline int gc_listdir(const char* path, gc_dirent* out, int max) {
 typedef struct {
     char name[256];
     int is_dir;
-} gc_dirent;
+} greenc_dirent;
 
 struct linux_dirent64 {
     unsigned long long d_ino;
@@ -84,7 +84,7 @@ static inline int sys_open_dir(const char* path) {
     return (int)ret;
 }
 
-static inline int gc_listdir(const char* path, gc_dirent* out, int max) {
+static inline int greenc_listdir(const char* path, greenc_dirent* out, int max) {
 
     char buf[4096];
     int fd = sys_open_dir(path);

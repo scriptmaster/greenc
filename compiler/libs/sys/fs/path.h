@@ -3,13 +3,13 @@
 #include "../builtin/strings.h"
 
 #ifdef _WIN32
-    #define GC_PATH_SEP '\\'
-    #define GC_PATH_SEP_STR "\\"
+    #define GREENC_PATH_SEP '\\'
+    #define GREENC_PATH_SEP_STR "\\"
 #else
-    #define GC_PATH_SEP '/'
-    #define GC_PATH_SEP_STR "/"
+    #define GREENC_PATH_SEP '/'
+    #define GREENC_PATH_SEP_STR "/"
 #endif
 
-static inline char* gc_path_join(const char* a, const char* b) {
-    return greenc_concat(a, GC_PATH_SEP_STR, b);
+static inline char* greenc_path_join(const char* a, const char* b) {
+    return greenc_concat(a, GREENC_PATH_SEP_STR, b);
 }

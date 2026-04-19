@@ -1,6 +1,6 @@
 #pragma once
 
-// INCLUDE this file if:   -nostdlib -static-libgcc -ffreestanding -fno-builtin
+// INCLUDE this file ONLY if:   -nostdlib -static-libgcc -ffreestanding -fno-builtin
 // otherwise include only greenc.h
 
 #include "greenc.h"
@@ -8,12 +8,15 @@
 /*
  * For external use:
  *
- *    defines prefix-less shims for all gc_* and greenc_*
+ *    defines prefix-less shims for all greenc_* and greenc_*
 */
 
 #define strlen greenc_strlen
 #define concat greenc_concat
-#define tree   gc_tree
+#define tree   greenc_tree
 #define free   greenc_free
+
+#define string_startswith greenc_string_startswith
+#define string_endswith greenc_string_endswith
 
 // ...

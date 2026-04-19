@@ -5,8 +5,8 @@
 // ----------------------------
 // Read full file (simple)
 // ----------------------------
-static inline char* gc_read_file(const char* path) {
-    gc_fd fd = sys_open_read(path);
+static inline char* greenc_read_file(const char* path) {
+    greenc_fd fd = sys_open_read(path);
     if ((isize)fd < 0) return NULL;
 
     usize cap = 4096;
@@ -27,7 +27,7 @@ static inline char* gc_read_file(const char* path) {
 // ----------------------------
 // Get current directory
 // ----------------------------
-static inline char* gc_getcwd_alloc() {
+static inline char* greenc_getcwd_alloc() {
     usize size = 512;
     char* buf = (char*)greenc_malloc(size);
     if (!buf) return NULL;

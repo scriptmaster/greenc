@@ -8,9 +8,9 @@
 // ----------------------------
 // Windows File API
 // ----------------------------
-typedef HANDLE gc_fd;
+typedef HANDLE greenc_fd;
 
-static inline gc_fd sys_open_read(const char* path) {
+static inline greenc_fd sys_open_read(const char* path) {
     return CreateFileA(
         path,
         GENERIC_READ,
@@ -22,13 +22,13 @@ static inline gc_fd sys_open_read(const char* path) {
     );
 }
 
-static inline isize sys_read(gc_fd fd, void* buf, usize len) {
+static inline isize sys_read(greenc_fd fd, void* buf, usize len) {
     DWORD read = 0;
     if (!ReadFile(fd, buf, (DWORD)len, &read, 0)) return -1;
     return (isize)read;
 }
 
-static inline void sys_close(gc_fd fd) {
+static inline void sys_close(greenc_fd fd) {
     CloseHandle(fd);
 }
 
@@ -50,9 +50,9 @@ static inline void sys_close(gc_fd fd) {
     #error Unsupported architecture
 #endif
 
-typedef int gc_fd;
+typedef int greenc_fd;
 
-static inline gc_fd sys_open_read(const char* path) {
+static inline greenc_fd sys_open_read(const char* path) {
     long ret;
 
 #if defined(__x86_64__)
@@ -74,7 +74,7 @@ static inline gc_fd sys_open_read(const char* path) {
     return (int)ret;
 }
 
-static inline isize sys_read(gc_fd fd, void* buf, usize len) {
+static inline isize sys_read(greenc_fd fd, void* buf, usize len) {
     isize ret;
 
 #if defined(__x86_64__)
@@ -96,7 +96,7 @@ static inline isize sys_read(gc_fd fd, void* buf, usize len) {
     return ret;
 }
 
-static inline void sys_close(gc_fd fd) {
+static inline void sys_close(greenc_fd fd) {
 
 #if defined(__x86_64__)
     __asm__ volatile (

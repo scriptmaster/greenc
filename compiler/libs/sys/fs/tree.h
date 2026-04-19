@@ -7,7 +7,7 @@
 #include "listdir.h"
 
 // forward
-static void gc_tree_internal(
+static void greenc_tree_internal(
     const char* path,
     const char* prefix,
     int* dir_count,
@@ -15,12 +15,12 @@ static void gc_tree_internal(
 );
 
 // public entry
-static inline void gc_tree(const char* path) {
+static inline void greenc_tree(const char* path) {
 
     int dir_count = 0;
     int file_count = 0;
 
-    gc_tree_internal(path, "", &dir_count, &file_count);
+    greenc_tree_internal(path, "", &dir_count, &file_count);
 
     // newline if something printed
     if (dir_count > 0 || file_count > 0)
@@ -39,19 +39,19 @@ static inline void gc_tree(const char* path) {
 }
 
 // recursive worker
-static void gc_tree_internal(
+static void greenc_tree_internal(
     const char* path,
     const char* prefix,
     int* dir_count,
     int* file_count
 ) {
 
-    gc_dirent* entries =
-        (gc_dirent*)greenc_malloc(sizeof(gc_dirent) * 128);
+    greenc_dirent* entries =
+        (greenc_dirent*)greenc_malloc(sizeof(greenc_dirent) * 128);
 
     if (!entries) return;
 
-    int count = gc_listdir(path, entries, 128);
+    int count = greenc_listdir(path, entries, 128);
 
     for (int i = 0; i < count; i++) {
 
@@ -71,7 +71,7 @@ static void gc_tree_internal(
 
             (*dir_count)++;
 
-            char* new_path = gc_path_join(path, entries[i].name);
+            char* new_path = greenc_path_join(path, entries[i].name);
 
             char* new_prefix;
             if (is_last)
@@ -79,7 +79,7 @@ static void gc_tree_internal(
             else
                 new_prefix = greenc_concat(prefix, "|   ");
 
-            gc_tree_internal(new_path, new_prefix, dir_count, file_count);
+            greenc_tree_internal(new_path, new_prefix, dir_count, file_count);
 
             greenc_free(new_path);
             greenc_free(new_prefix);
