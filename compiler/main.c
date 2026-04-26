@@ -19,8 +19,14 @@ int greenc_main() {
 
     if (msg) {
         print(msg);
-        free(msg);
     }
+    // free(msg); msg = NULL;
+    release(msg);
+    release(msg);
+    release(msg);
+
+    // char* s = "hello"; // static memory
+    // release(s);  // 💥 crash
 
     char* cwd = greenc_getcwd_alloc();
     if (cwd) {
@@ -34,11 +40,14 @@ int greenc_main() {
     if (content) {
         print("file read ok");
         int len = greenc_strlen(content);
-        free(content);
     } else {
         print("file not found");
     }
 
+    free(content); content = NULL;
+    free(content);
+    free(content);
+    free(content);
 
     char* source = "fn main() { print(\"hi world\"); }";
 
@@ -71,12 +80,16 @@ int greenc_main() {
         // SEARCH: parse_file(
         parse_file(src, &keywords);
 
-        greenc_free(src); // free owned in scope
+        greenc_main_for_defer:
+        greenc_free(src); ///free owned in scope
     }
 
     greenc_string_list_free(&files);
 
     print("done.");
+
+greenc_main_defer:
+    greenc_free(cwd);
 
     return 0;
 }

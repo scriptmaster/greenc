@@ -11,16 +11,14 @@ build:
 	timed $(CC) $(CFLAGS) -I$(INCLUDES) main.c -o greenc.exe $(WINFLAGS)
 	ls -lah greenc.exe
 	ldd greenc.exe
-	# greenc.exe
-	# greenc.exe --help
-	# greenc.exe build ../
-	greenc.exe build ../ -o ../build/app/
+	greenc.exe build ../src/ -o ../build/
 
 # LXCC=zig cc
 # LXFLAGS=-target x86_64-linux-musl $(OPT) $(STD) -static-libgcc -static
 
 LXCC=x86_64-pc-linux-gnu-gcc.exe
 LXFLAGS=$(OPT) $(CSTD) -nostdlib -static-libgcc -static -ffreestanding -fno-builtin
+# we will implement -ldl later.
 
 linux:
 	timed $(LXCC) $(LXFLAGS) -I$(INCLUDES) main.c -o greenc.elf

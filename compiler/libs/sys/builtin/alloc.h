@@ -25,7 +25,7 @@ static inline void* greenc_malloc(size_t size) {
     return HeapAlloc(GetProcessHeap(), 0, size);
 #else
     /* Linux mmap Allocation */
-    size_t total_size = size + sizeof(greenc_mem_header_t);
+    size_t total_size = sizeof(greenc_mem_header_t) + size;
     void* addr;
 
     __asm__ volatile (
@@ -66,6 +66,26 @@ static inline void greenc_free(void* ptr) {
         : "rcx", "r11", "memory"
     );
 #endif
+    // ptr = NULL; // no effect, it must set to null at source
+}
+
+static inline void greenc_mfree(void** ptr) {
+    if (!ptr || !*ptr) return;
+
+#ifdef _WIN32
+    HeapFree(GetProcessHeap(), 0, *ptr);
+#else
+    greenc_mem_header_t* h = (greenc_mem_header_t*)*ptr - 1;
+    __asm__ volatile (
+        "syscall"
+        :
+        : "a" ((long)GREENC_SYS_MUNMAP), "D" (h), "S" (h->size)
+        : "rcx", "r11", "memory"
+    );
+#endif
+    *ptr = NULL; // ✅
 }
 
 #endif
+
+#define greenc_release(ptr) greenc_mfree((void**)&(ptr))
