@@ -80,19 +80,39 @@ greenc_free(heap);
 
 ## Chaining Rules
 
+No memory allocations allowed in fp-style chains. Compiler throws error and forces you to write them procedurally.
+
 ❌ Invalid:
 ```c
 char* x = f(g(h(i)));
 ```
 
 ✔ Valid:
+### Option 1:
 ```c
 char* a = h(i); ///move
-char* b = g(a); ///move
-greenc_free(a);
 
-char* x = f(b); ///move
-greenc_free(b);
+const char* b = g(a); ///read
+
+char* x = f((char*)b); ///move   // OK (a still alive)
+
+greenc_free(a);
+greenc_free(x);
+```
+
+### Option 2:
+```
+char* a = h(i); ///move
+
+const char* b = g(a); ///read
+
+char* tmp = string_view_to_string((string_view){b, len}); ///move
+
+greenc_free(a);  // now safe
+
+char* x = f(tmp); ///move
+greenc_free(tmp);
+greenc_free(x);
 ```
 
 ---
@@ -103,7 +123,7 @@ Only annotated functions may return owned values:
 
 ```c
 ///make_buffer:
-char* make_buffer() /* move: greenc_free */
+char* buffer_create() /* move: greenc_free */
 {
     char* buf = alloc(); ///move
     return buf;
