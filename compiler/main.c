@@ -1,5 +1,7 @@
+//#pragma file: compiler/main.c
 #include "libgreenc.h"
 #include "lang/lang.h"
+#include "args.h"
 
 #define VERSION "v1.0.5"
 
@@ -10,86 +12,125 @@ static int filter_c_files(const char* name) {
            string_endswith(name, ".gc");
 }
 
-int greenc_main() {
-    int result = 1;
-    print("green c (" VERSION ")\n");
+int greenc_main(
+    int argc,
+    char** argv,
+    char** envp
+) {
 
-    char* msg = greenc_concat("Version: ", VERSION);
-    // defer msg;
+    print("greenc (" VERSION ")\n");
 
-    if (msg) {
-        print(msg);
+    // ---------------------------------
+    // parse args
+    // ---------------------------------
+    args_result args = args_parse(argc, argv);
+    greenc_args cli = greenc_args_parse(args);
+
+    if (cli.error) {
+        return 1;
     }
-    // free(msg); msg = NULL;
-    release(msg);
-    release(msg);
-    release(msg);
 
-    // char* s = "hello"; // static memory
-    // release(s);  // 💥 crash
+    // ---------------------------------
+    // require input files
+    // ---------------------------------
+    if (cli.input_files.count == 0) {
+        print("greenc: error: no input files");
+        return 1;
+    }
 
+    // ---------------------------------
+    // debug print
+    // ---------------------------------
+    print("output:");
+    print(cli.output_file);
+
+    print("optimization:");
+    print(str(cli.optimize_level));
+
+    // ---------------------------------
+    // shared keyword table
+    // ---------------------------------
+    greenc_keywords keywords;
+
+    greenc_keywords_init(
+        &keywords
+    );
+
+    
     char* cwd = greenc_getcwd_alloc();
     if (cwd) {
         print("cwd:");
         print(cwd);
-
-        tree(cwd);
     }
+    
+    // ---------------------------------
+    // parse input files
+    // ---------------------------------
+    for (
+        int i = 0;
+        i < cli.input_files.count;
+        i++
+    ) {
 
-    char* content = greenc_read_file("main.c");
-    if (content) {
-        print("file read ok");
-        int len = greenc_strlen(content);
-    } else {
-        print("file not found");
-    }
+        char* path =
+            cli.input_files.items[i];
 
-    free(content); content = NULL;
-    free(content);
-    free(content);
-    free(content);
-
-    char* source = "fn main() { print(\"hi world\"); }";
-
-    // SEARCH: lexer_loop
-    greenc_lexer lexer = { source, 0 };
-    greenc_keywords keywords;
-    greenc_keywords_init(&keywords);
-
-    while (1) {
-        greenc_token tok = greenc_next_token(&lexer, &keywords); ///stack
-        if (tok.kind == TOK_EOF) break;
-        sys_write("Token=", 6);
-        sys_write(tok.start, tok.len);
-        sys_write("\n", 1);
-    }
-
-
-    // ANCHOR: files::collect
-    string_list files = greenc_files_collect_filter(cwd, filter_c_files); ///own
-    greenc_string_list_sort(&files);
-
-    for (int i = 0; i < files.count; i++) { // no triple-slash marker required for 0
-        char* path = files.items[i]; ///read
-        char* src = greenc_read_file(path); ///own
-        if (!src) continue;
-
-        print("---- parsing file ----");
+        print("input:");
         print(path);
 
-        // SEARCH: parse_file(
-        parse_file(src, &keywords);
+        // -----------------------------
+        // read source
+        // -----------------------------
+        char* source =
+            greenc_read_file(path);
 
-        greenc_main_for_defer:
-        greenc_free(src); ///free owned in scope
+        if (!source) {
+            print("greenc: unable to read input file");
+            print(path);
+            continue;
+        }
+
+        // -----------------------------
+        // lexer
+        // -----------------------------
+        greenc_lexer lexer = {
+            source,
+            0
+        };
+
+
+        while (1) {
+
+            greenc_token tok =
+                greenc_next_token(
+                    &lexer,
+                    &keywords
+                );
+
+            if (
+                tok.kind ==
+                TOK_EOF
+            ) {
+                break;
+            }
+
+            sys_write("Token=", 6);
+
+            sys_write(
+                tok.start,
+                tok.len
+            );
+
+            sys_write("\n", 1);
+        }
+
+
+        // -----------------------------
+        // cleanup
+        // -----------------------------
+        release(source);
     }
 
-    greenc_string_list_free(&files);
-
-    print("done.");
-
-greenc_main_defer:
-    greenc_free(cwd);
 
     return 0;
 }

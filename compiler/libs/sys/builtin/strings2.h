@@ -1,6 +1,15 @@
 #pragma once
 #include "types.h"
 
+static int greenc_strcmp(const char* a, const char* b);
+
+static inline int greenc_streq(
+    const char* a,
+    const char* b
+) {
+    return greenc_strcmp(a, b) == 0;
+}
+
 // SEARCH: greenc_str_equals(
 static inline int greenc_str_equals(
     const char* a, int a_len,

@@ -1,6 +1,8 @@
 #pragma once
 #include "builtin/types.h"
-#include "builtin/strings.h"
+#include "builtin/strings1.h"
+
+static inline size_t greenc_strlen(const char* s);
 
 // ----------------------------
 // Windows

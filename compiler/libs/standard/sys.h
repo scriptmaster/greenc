@@ -7,4 +7,5 @@
 #include "../sys/builtin/containers.h"
 #include "../sys/sys_write.h"
 #include "../sys/start.h"
+#include "../sys/args.h"
 #include "../sys/fs.h"

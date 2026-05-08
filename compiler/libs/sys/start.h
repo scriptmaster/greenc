@@ -1,61 +1,73 @@
+//#pragma file "compiler/libs/sys/start.h"
 #pragma once
 
 #ifdef __linux__
 
-#include "builtin/types.h"
-
-// ----------------------------
-// sys_exit (multi-arch)
-// ----------------------------
-static inline __attribute__((noreturn)) void sys_exit(int code) {
-
-#if defined(__x86_64__)
-
-    __asm__ volatile (
-        "syscall"
-        :
-        : "a"(60), "D"(code)
-        : "rcx", "r11", "memory"
-    );
-
-#elif defined(__aarch64__)
-
-    register long x0 __asm__("x0") = code;
-    register long x8 __asm__("x8") = 93; // SYS_exit for ARM64
-
-    __asm__ volatile (
-        "svc #0"
-        :
-        : "r"(x0), "r"(x8)
-        : "memory"
-    );
-
-#else
-    #error Unsupported architecture
-#endif
-
-    // Safety: never return
-    while (1) { }
-}
+#include "exit.h"
 
 // ----------------------------
 // forward declaration
 // ----------------------------
-int greenc_main();
+int greenc_main(int argc, char** argv, char** envp);
 
 // ----------------------------
-// entry point (_start)
+// _start
 // ----------------------------
-__attribute__((noreturn)) void _start() {
-    int ret = greenc_main();
+__attribute__((noreturn))
+void _start() {
+
+#if defined(__x86_64__)
+
+    long argc;
+    char** argv;
+
+    __asm__ volatile (
+        "mov (%%rsp), %0\n"
+        "lea 8(%%rsp), %1\n"
+        : "=r"(argc), "=r"(argv)
+        :
+        : "memory"
+    );
+
+    char** envp = argv + argc + 1;
+
+    int ret = greenc_main((int)argc, argv, envp);
     sys_exit(ret);
+
+#elif defined(__aarch64__)
+
+    long argc;
+    char** argv;
+
+    __asm__ volatile (
+        "ldr %0, [sp]\n"
+        "add %1, sp, #8\n"
+        : "=r"(argc), "=r"(argv)
+        :
+        : "memory"
+    );
+
+    char** envp = argv + argc + 1;
+
+    int ret = greenc_main((int)argc, argv, envp);
+    sys_exit(ret);
+
+#else
+    #error Unsupported architecture
+#endif
 }
 
 #endif
 
 
 #ifndef _WIN32
-int main() {
-    return greenc_main();
+int main(int argc, char** argv, char** envp) {
+    return greenc_main(argc, argv, envp);
 }
+#endif
+
+#ifdef _WIN32
+
+#include "winstart.h"
+
 #endif

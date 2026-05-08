@@ -3,15 +3,16 @@ all: build
 CC=gcc
 OPT=-Os
 CSTD=-std=c17
-CFLAGS=$(OPT) $(CSTD) -nostdlib -static-libgcc -ffreestanding -fno-builtin
-WINFLAGS=-lshell32 -lkernel32 -luser32 -Wl,-egreenc_main
+CFLAGS=$(OPT) $(CSTD) -static-libgcc -ffreestanding -fno-builtin -nostdlib
+WINFLAGS=-lshell32 -lkernel32 -luser32 -Wl,-egreenc_start
 INCLUDES=./libs/
 
 build:
 	timed $(CC) $(CFLAGS) -I$(INCLUDES) main.c -o greenc.exe $(WINFLAGS)
 	ls -lah greenc.exe
 	ldd greenc.exe
-	greenc.exe build ../src/ -o ../build/
+	cp greenc.exe ../
+	cd .. && greenc.exe -o main.exe src/main.c
 
 # LXCC=zig cc
 # LXFLAGS=-target x86_64-linux-musl $(OPT) $(STD) -static-libgcc -static
