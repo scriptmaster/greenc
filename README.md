@@ -58,7 +58,7 @@ Missing marker → compile error
 ```
 _create     → heap (///move)
 _init       → stack (///stack)
-_to_string  → heap (///move)
+_tostring  → heap (///move)
 _str        → lightweight / borrowed
 _new        → allowed ONLY for heap (///move)
 ```
@@ -72,7 +72,7 @@ char* buf = buffer_create(); ///move
 greenc_free(buf);
 
 string_view s = string_view_init("hello"); ///stack
-char* heap = string_view_to_string(s); ///move
+char* heap = string_view_tostring(s); ///move
 greenc_free(heap);
 ```
 
