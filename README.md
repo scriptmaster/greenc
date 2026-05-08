@@ -80,12 +80,21 @@ greenc_free(heap);
 
 ## Chaining Rules
 
-No memory allocations allowed in fp-style chains. Compiler throws error and forces you to write them procedurally.
+No memory allocations allowed in fp-style chains.
+
+Compiler enforces discipline for readable and maintainable code, for you to write them procedurally.
+
+✔ Valid:
+```
+int x = f(g(h(i))); // allowed for non allocating functions. NOTE: missing *
+```
 
 ❌ Invalid:
 ```c
-char* x = f(g(h(i)));
+char* x = f(g(h(i))); // easy to write and forget. difficult to remember and questions arise the next day about memory safety, error handling and ownership.
 ```
+
+In functional programming, its all happy path, and "look/do simple" math-formula like functions, but in systems and computers, there is always a branch of error handling need to be taken care.
 
 ✔ Valid:
 ### Option 1:
