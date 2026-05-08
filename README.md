@@ -1,16 +1,29 @@
 # GreenC
 
-greenc is valid, modern, safe c language with `-nostdlib -fno-builtin -ffreestanding` flags and a built-in safe lib.
+GreenC = C with enforced safety discipline
+
+GreenC is a modern, memory-safe extension of C designed to work with:
+
+```
+-nostdlib -fno-builtin -ffreestanding
+```
 
 All functions are available in `libgreenc.h`
 
 Macro based C compiler with built-in borrow checker
 
-```
-.g extension for the version without macros and .cs like syntax.
-.gc for migrating/mixing exiting C code along with the new greenc features.
-.gy extension for a python like syntax. Thank goodness we missed a = "py" like syntax.
-```
+It compiles to clean C (Emit-C backend) and produces small deterministic binaries., for use in servers to desktops to micro-controllers.
+
+---
+
+## Core Philosophy
+
+C, explicit ownership, contracts, compile-time safety
+
+No hidden behavior. No implicit ownership. Everything is explicit.
+
+---
+
 
 ## Smallest Binaries
 
@@ -18,26 +31,180 @@ Produces tiny binaries (< 30 KB) with Clean C code, that is readable and maintai
 
 Compiles to C (no IR, LLVM), uses gcc or clang or cl.exe
 
+## Ownership Model
 
-Two worded types are heap allocated, otherwise stack allocated.
+```c
+///move   → owns heap (must free exactly once)
+///read   → alias (must not free)
+///stack  → value (no heap)
+```
 
-string list files = greenc_list_files(cwd);
+Missing marker → compile error
 
-types:
-dictionary
-queue
-ringbuffer
+---
 
-# Greenc Roadmap (Emit-C Backend)
+## Pointer Rules
 
-## 🎯 Vision
+- All `*` pointers are tracked
+- No RC/GC runtime
+- Every pointer must be:
+  - freed at last usage OR
+  - freed at end of scope
 
-Greenc is:
-- A **memory-safe systems language**
-- With **borrow semantics (Rust-like)**
-- Compiling to **C (Emit-C backend)**
-- With a **minimal libc replacement runtime**
-- And a **rich native capability layer (AI, HTTP, GUI)**
+---
+
+## Naming Conventions
+
+```
+_create     → heap (///move)
+_init       → stack (///stack)
+_to_string  → heap (///move)
+_str        → lightweight / borrowed
+_new        → allowed ONLY for heap (///move)
+```
+
+---
+
+## Example
+
+```c
+char* buf = buffer_create(); ///move
+greenc_free(buf);
+
+string_view s = string_view_init("hello"); ///stack
+char* heap = string_view_to_string(s); ///move
+greenc_free(heap);
+```
+
+---
+
+## Chaining Rules
+
+❌ Invalid:
+```c
+char* x = f(g(h(i)));
+```
+
+✔ Valid:
+```c
+char* a = h(i); ///move
+char* b = g(a); ///move
+greenc_free(a);
+
+char* x = f(b); ///move
+greenc_free(b);
+```
+
+---
+
+## Escape Rules
+
+Only annotated functions may return owned values:
+
+```c
+///make_buffer:
+char* make_buffer() /* move: greenc_free */
+{
+    char* buf = alloc(); ///move
+    return buf;
+}
+```
+
+---
+
+## string_view (Slices)
+
+```c
+typedef struct {
+    const char* data;
+    int len;
+} string_view;
+```
+
+Rules:
+- always ///read
+- never freed
+- cannot outlive source
+- cannot be ///move
+
+---
+
+## Invalid Slice
+
+```c
+string_view bad() {
+    char* tmp = read(); ///move
+    string_view s = { tmp, 5 };
+    greenc_free(tmp);
+    return s; // ERROR
+}
+```
+
+---
+
+## Type Ownership
+
+```c
+///string_list:
+struct string_list {
+    char** items; ///move
+}
+
+/* move: greenc_string_list_free */
+```
+
+---
+
+## Memory Report
+
+Each function produces:
+
+```
+Assignments: N
+Moves: N
+Reads: N
+Frees: N
+
+Bugs:
+Use after free
+Double free
+Heap escapes
+```
+
+---
+
+## Status
+
+### Runtime Core (DONE)
+- syscalls
+- allocator
+- strings
+- no libc
+
+### Filesystem (DONE)
+- file read
+- directory listing
+- traversal
+- tree
+
+---
+
+## Next
+
+- parser
+- borrow checker
+- emit-C backend
+
+---
+
+## Roadmap
+
+1. Lexer
+2. Parser
+3. Checker
+4. Codegen
+5. Stdlib
+6. Networking / AI / GUI
 
 ---
 
@@ -65,7 +232,7 @@ Greenc is:
 
 ## File System Graph
 - [ ] sorting (deterministic builds)
-- [ ] filtering (`.c`, `.h`, `.gc`)
+- [ ] filtering (`.c`, `.h`)
 - [ ] file classification
 - [ ] build graph struct
 
@@ -79,12 +246,11 @@ Greenc is:
 # 🧠 Phase 2 — Language Core
 
 ## Lexer
-- [ ] tokens:
-  - identifiers
-  - numbers
-  - strings
-  - keywords (`fn`, `let`, `return`)
-  - operators/symbols
+- [x] identifiers
+- [x] numbers
+- [x] strings
+- [x] operators/symbols
+- [x] marker comments (`///move`, contracts)
 
 ## Parser (minimal)
 - [ ] AST nodes:
@@ -93,22 +259,51 @@ Greenc is:
   - return
 - [ ] block parsing
 - [ ] expression parsing (basic)
+- [ ] marker attachment to AST
 
 ---
 
 # 🧠 Phase 3 — Semantic Layer
 
 ## Type System
-- [ ] primitive types (`int`, `string`)
+- [ ] primitive types (`int`, `string_view`)
 - [ ] variable declarations
 - [ ] function signatures
+- [ ] struct/type contracts
 
 ## Borrow Checker (core differentiator)
-- [ ] ownership rules
-- [ ] borrow vs move
-- [ ] lifetime tracking (minimal)
-- [ ] compile-time errors
+- [ ] ownership rules (`///move`, `///read`, `///stack`)
+- [ ] pointer tracking (no ref counting)
+- [ ] free enforcement (same scope / last use)
+- [ ] escape rules
+- [ ] chaining rules
+- [ ] slice (`string_view`) lifetime rules
+- [ ] compile-time diagnostics
 
+# 🧪 Phase 3.5 — Runtime Verification (Sanitizers)
+
+## AddressSanitizer (ASan)
+- [ ] integration flag (`-fsanitize=address`)
+- [ ] detect:
+  - buffer overflow
+  - use-after-free (runtime safety net)
+  - heap corruption
+
+## UndefinedBehaviorSanitizer (UBSan)
+- [ ] integration flag (`-fsanitize=undefined`)
+- [ ] detect:
+  - null dereference
+  - integer overflow
+  - invalid casts
+  - misaligned access
+
+## Build Modes
+- [ ] debug mode → ASan + UBSan enabled
+- [ ] release mode → disabled
+
+## Integration
+- [ ] `greenc build --sanitize`
+- [ ] pass flags to gcc/clang
 ---
 
 # ⚙️ Phase 4 — Emit-C Backend
@@ -142,9 +337,14 @@ Greenc is:
 
 ## Core
 - [ ] memory
-- [ ] strings
+- [ ] strings / `string_view`
 - [ ] file I/O
 - [ ] path utilities
+
+## Containers
+- [ ] dictionary
+- [ ] queue
+- [ ] ringbuffer
 
 ## Extensions
 - [ ] JSON (parse + serialize)
@@ -153,7 +353,7 @@ Greenc is:
 
 ---
 
-# 🚀 Phase 7 — Runtime Capabilities (Your MVP Features)
+# 🚀 Phase 7 — Runtime Capabilities (MVP Features)
 
 ## Networking
 - [ ] HTTP server (Windows + Linux)
@@ -171,7 +371,7 @@ Greenc is:
 
 ---
 
-# 🤖 Phase 8 — AI Integration (IMPORTANT)
+# 🤖 Phase 8 — AI Integration
 
 - [ ] dynamic library loading (`.dll` / `.so`)
 - [ ] llama.cpp integration
@@ -210,6 +410,7 @@ Greenc is:
 
 - [ ] error messages (compiler)
 - [ ] diagnostics
+- [ ] memory reports (per function)
 - [ ] build caching
 - [ ] package system (optional)
 
@@ -221,7 +422,7 @@ Greenc is:
 
 1. FS + build graph ✔
 2. Sorting + filtering
-3. Lexer
+3. Lexer ✔
 4. Parser
 5. Borrow checker
 6. Emit-C backend
@@ -235,26 +436,14 @@ Greenc is:
 
 ---
 
-# 🧠 Core Philosophy
-
-- No libc dependency (initially)
-- Deterministic builds
-- Explicit memory model
-- Clean separation:
-  - compiler
-  - runtime
-  - libraries
-
----
-
 # 🎯 MVP Definition
 
 Greenc MVP =
 
-- compile `.gc` → C → binary
+- compile `.c` → checked → C → binary
 - borrow-checked functions
 - minimal stdlib
-- file-based modules
+- deterministic build
 
 Optional MVP+:
 - HTTP server
@@ -262,9 +451,8 @@ Optional MVP+:
 
 ---
 
-# 🚀 Future
+# Rejected:
 
-- direct backend (no C)
-- JIT / REPL
-- cross-compilation toolchain
-- package ecosystem
+[X] direct backend. Always readable C.
+[X] cross-compilation toolchain (integration with zig or use platform/cicd image).
+[X] package ecosystem. C already has a large ecosystem.
