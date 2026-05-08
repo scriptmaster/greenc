@@ -85,7 +85,7 @@ No memory allocations allowed in fp-style chains.
 Compiler enforces discipline for readable and maintainable code, for you to write them procedurally.
 
 ✔ Valid:
-```
+```c
 int x = f(g(h(i))); // allowed for non allocating functions. NOTE: missing *
 ```
 
@@ -110,7 +110,7 @@ greenc_free(x);
 ```
 
 ### Option 2:
-```
+```c
 char* a = h(i); ///move
 
 const char* b = g(a); ///read
