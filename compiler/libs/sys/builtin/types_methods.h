@@ -2,7 +2,7 @@
 #include "alloc.h"
 #include "types_intrinsic.h"
 #include "../sys_write.h"
-#include "strings3_conv.h"
+#include "strings3.h"
 
 // ----------------------------
 // string_list helpers
@@ -15,8 +15,8 @@ static inline void greenc_string_list_init(string_list* list) {
 
 static inline void greenc_string_list_push(string_list* list, char* path) {
 
-	if (!list->items && list->cap == 0) {
-	    greenc_string_list_init(list);
+	if (!list->items) { // && list->cap == 0) {
+		greenc_string_list_init(list);
 	}
 
     if (list->count >= list->cap) {

@@ -126,18 +126,32 @@ greenc_free(x);
 
 ---
 
-## Escape Rules
+## Escape (Return) Rules
 
-Only annotated functions may return owned values:
+1. Only annotated functions may return owned values:
 
 ```c
 ///make_buffer:
-char* buffer_create() /* move: greenc_free */
+char* buffer_create() /* defer greenc_free */
 {
     char* buf = alloc(); ///move
     return buf;
 }
 ```
+
+2. Returning a struct (non-intrinsic type) returns a copy of the struct, not the original stack address.
+
+// In C: returning a struct (non-intrinsic type) returns a copy of the struct, not the original stack address.
+buf32 s = {0};
+...
+return s;
+/** Here: `return s;` is Equivalent to:
+  * buf32 temp;
+  * memcpy(&return_slot, &temp, sizeof(buf32));
+*/
+
+3. In most cases, a function should either return one value or an error (int) and an out parameter as reference.
+
 
 ---
 

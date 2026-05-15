@@ -28,8 +28,8 @@ static inline void greenc_tree(const char* path) {
 
     // summary
     char* summary = greenc_concat(
-        greenc_itoa(dir_count), " directories, ",
-        greenc_itoa(file_count), " files"
+        str(dir_count), " directories, ",
+        str(file_count), " files"
     );
 
     if (summary) {

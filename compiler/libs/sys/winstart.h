@@ -112,13 +112,11 @@ void greenc_start() {
             argv,
             64
         );
-    sys_write("debug argc=", 11);
-    
-    buf32 s = tostring(argc);
-    
-    sys_write(s.data, greenc_strlen(s.data));
-    
-    sys_write("\n", 1);
+
+    // sys_write("debug argc=", 11);
+    // buf32 s = tostring(argc);
+    // sys_write(s.str, greenc_strlen(s.str));
+    // sys_write("\n", 1);
 
     // -----------------------------
     // call main

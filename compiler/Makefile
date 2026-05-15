@@ -12,7 +12,7 @@ build:
 	ls -lah greenc.exe
 	ldd greenc.exe
 	cp greenc.exe ../
-	cd .. && greenc.exe -o main.exe src/main.c
+	cd .. && greenc.exe -o main.exe src/main.c && gcc -o main.exe .cache/greenc/*/main.c -std=c17
 
 # LXCC=zig cc
 # LXFLAGS=-target x86_64-linux-musl $(OPT) $(STD) -static-libgcc -static

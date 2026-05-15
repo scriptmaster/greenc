@@ -1,8 +1,6 @@
 #ifndef GREENC_ALLOC_H
 #define GREENC_ALLOC_H
 
-#include "types.h"
-
 #ifdef _WIN32
     #include <windows.h>
 #else

@@ -28,18 +28,28 @@ typedef __SIZE_TYPE__ size_t;   // compiler-provided (best)
 // size_t;
 // }
 
-typedef char* cstring;        // owned heap string
-typedef const char* cstr;     // borrowed null-terminated string
+// typedef char* cstring;        /// owned    \0 string
+// typedef const char* cstr;     /// borrowed \0 string
+#define cstring char*
+#define cstr const char*
+#define conststring const char*
 
 typedef struct {
-    char* data;               // owned
+    char* str;               /// owned
     size_t len;
 } string;
 
 typedef struct {
-    const char* data;         // borrowed
+    const char* str;         /// borrowed
     size_t len;
 } string_view;
+
+typedef struct {
+    char* str;               /// owned
+    size_t len;
+    size_t cap;
+} string_builder;
+
 
 #define strview string_view
 
@@ -51,53 +61,23 @@ typedef struct {
 #define NULL ((void*)0)
 #endif
 
-
-
-// ----------------------------
-// Heap Allocated Types
-// ----------------------------
-typedef struct {
-    char** items;
-    int count;
-    int cap;
-} string_list;
-
-typedef struct {
-    int* items;
-    int count;
-    int cap;
-} int_list;
-
-typedef struct {
-    float* items;
-    int count;
-    int cap;
-} float_list;
-
-typedef struct {
-    float** items;
-    int count;
-    int cap;
-} float_dimensions;
-
-// typedef struct {
-//     char** items;
-//     int count;
-//     int cap;
-// } queue;
-// ringbuffer, string etc.
-
+// @see: buffers.h for greenc_queue and greenc_ring
 
 #define KB(x) ((x) * 1024)
 // -------------------------------------
 // fixed stack buffer
 // -------------------------------------
-typedef struct { char data[32]; } buf32;
-typedef struct { char data[64]; } buf64;
-typedef struct { char data[128]; } buf128;
-typedef struct { char data[256]; } buf256;
-typedef struct { char data[KB(1)]; } buf1k;
-typedef struct { char data[KB(4)]; } buf4k;
-typedef struct { char data[KB(8)]; } buf8k;
-typedef struct { char data[KB(16)]; } buf16k;
-typedef struct { char data[KB(64)]; } buf64k;
+typedef struct { char str[32]; } buf32;
+typedef struct { char str[64]; } buf64;
+typedef struct { char str[128]; } buf128;
+typedef struct { char str[256]; } buf256;
+typedef struct { char str[KB(1)]; } buf1k;
+typedef struct { char str[KB(4)]; } buf4k;
+typedef struct { char str[KB(8)]; } buf8k;
+// beyond this use arena/page allocations
+
+
+#define buffer buf256
+#define bigbuffer buf1k
+#define hugebuffer buf4k
+#define largebuffer buf8k

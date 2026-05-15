@@ -1,148 +1,321 @@
 #pragma once
 
 #include "types.h"
+#include "ast_nodes.h"
 #include "lexer.h"
 #include "../libs/standard.h"
-
-// --------------------------------------------------
-// parser struct
-// --------------------------------------------------
 
 typedef struct {
     greenc_lexer* lexer;
     greenc_keywords* keywords;
     greenc_token tok;
+    int failed;
 } greenc_parser;
 
-// --------------------------------------------------
-// helpers
-// --------------------------------------------------
-
-// SEARCH: parser_next(
 static inline void parser_next(greenc_parser* p) {
     p->tok = greenc_next_token(p->lexer, p->keywords);
 }
 
-// SEARCH: parser_expect(
 static inline void parser_expect(greenc_parser* p, greenc_tok_kind kind) {
     if (p->tok.kind != kind) {
         print("parse error: unexpected token");
+        p->failed = 1;
         return;
     }
     parser_next(p);
 }
 
-// --------------------------------------------------
-// debug token print (useful now)
-// --------------------------------------------------
-
-// SEARCH: parser_debug_token(
-static inline void parser_debug_token(greenc_token tok) {
-    print(tok.start);
-
-    sys_write("\tToken=", 6);
-    sys_write(tok.start, tok.len);
-    sys_write("\n", 1);
-
-    char* len_str = greenc_itoa(tok.len);
-    sys_write("\t\tlen=", 7);
-    sys_write(len_str, greenc_strlen(len_str));
-
-    greenc_free(len_str);
+static greenc_expr* greenc_expr_new(greenc_expr_kind k) {
+    greenc_expr* e = (greenc_expr*)greenc_malloc(sizeof(greenc_expr));
+    if (!e) return NULL;
+    e->kind = k;
+    e->tok = (greenc_token){TOK_EOF, "", 0};
+    e->inner = NULL;
+    e->callee = NULL;
+    e->args = NULL;
+    e->arg_count = 0;
+    return e;
 }
 
-// --------------------------------------------------
-// parse return / error
-// --------------------------------------------------
+static greenc_stmt* greenc_stmt_new(greenc_stmt_kind k, greenc_expr* ex) {
+    greenc_stmt* s = (greenc_stmt*)greenc_malloc(sizeof(greenc_stmt));
+    if (!s) return NULL;
+    s->kind = k;
+    s->expr = ex;
+    return s;
+}
 
-// SEARCH: parse_return(
-static void parse_return(greenc_parser* p) {
+static greenc_program* greenc_program_new(void) {
+    greenc_program* pr = (greenc_program*)greenc_malloc(sizeof(greenc_program));
+    if (!pr) return NULL;
+    pr->funcs = NULL;
+    pr->func_count = 0;
+    pr->func_cap = 0;
+    return pr;
+}
 
-    // skip return / error
-    parser_next(p);
+static void greenc_func_push_stmt(greenc_func* gfunc, greenc_stmt* st) {
+    if (gfunc->stmt_count >= gfunc->stmt_cap) {
+        int ncap = gfunc->stmt_cap ? gfunc->stmt_cap * 2 : 8;
+        greenc_stmt** ns =
+            (greenc_stmt**)greenc_malloc(sizeof(greenc_stmt*) * (size_t)ncap);
+        if (!ns) return;
+        for (int i = 0; i < gfunc->stmt_count; i++) {
+            ns[i] = gfunc->stmts[i];
+        }
+        gfunc->stmts = ns;
+        gfunc->stmt_cap = ncap;
+    }
+    gfunc->stmts[gfunc->stmt_count++] = st;
+}
 
-    if (p->tok.kind != TOK_NUMBER) {
-        print("parse error: expected number");
+static void greenc_program_push_func(greenc_program* pr, greenc_func* gfunc) {
+    if (pr->func_count >= pr->func_cap) {
+        int ncap = pr->func_cap ? pr->func_cap * 2 : 8;
+        greenc_func** nf =
+            (greenc_func**)greenc_malloc(sizeof(greenc_func*) * (size_t)ncap);
+        if (!nf) return;
+        for (int i = 0; i < pr->func_count; i++) {
+            nf[i] = pr->funcs[i];
+        }
+        pr->funcs = nf;
+        pr->func_cap = ncap;
+    }
+    pr->funcs[pr->func_count++] = gfunc;
+}
+
+static void greenc_expr_args_push(
+    greenc_expr*** arr,
+    int* count,
+    int* cap,
+    greenc_expr* e
+) {
+    if (*count >= *cap) {
+        int ncap = *cap ? *cap * 2 : 4;
+        greenc_expr** na =
+            (greenc_expr**)greenc_malloc(sizeof(greenc_expr*) * (size_t)ncap);
+        if (!na) return;
+        for (int i = 0; i < *count; i++) {
+            na[i] = (*arr)[i];
+        }
+        *arr = na;
+        *cap = ncap;
+    }
+    (*arr)[(*count)++] = e;
+}
+
+static greenc_expr* parse_expr(greenc_parser* p);
+
+static greenc_expr* parse_primary(greenc_parser* p) {
+    if (p->failed) return NULL;
+
+    if (p->tok.kind == TOK_NUMBER) {
+        greenc_expr* e = greenc_expr_new(GREENC_EXPR_INT);
+        if (!e) return NULL;
+        e->tok = p->tok;
+        parser_next(p);
+        return e;
+    }
+
+    if (p->tok.kind == TOK_STRING) {
+        greenc_expr* e = greenc_expr_new(GREENC_EXPR_STRING);
+        if (!e) return NULL;
+        e->tok = p->tok;
+        parser_next(p);
+        return e;
+    }
+
+    if (p->tok.kind == TOK_IDENT) {
+        greenc_expr* e = greenc_expr_new(GREENC_EXPR_IDENT);
+        if (!e) return NULL;
+        e->tok = p->tok;
+        parser_next(p);
+        return e;
+    }
+
+    if (p->tok.kind == TOK_LPAREN) {
+        parser_next(p);
+        greenc_expr* inner = parse_expr(p);
+        parser_expect(p, TOK_RPAREN);
+        return inner;
+    }
+
+    print("parse error: expected expression");
+    p->failed = 1;
+    return NULL;
+}
+
+static greenc_expr* parse_postfix(greenc_parser* p) {
+    greenc_expr* e = parse_primary(p);
+    if (!e || p->failed) return e;
+
+    while (p->tok.kind == TOK_LPAREN) {
+        parser_next(p);
+        greenc_expr** args = NULL;
+        int n = 0;
+        int cap = 0;
+
+        if (p->tok.kind != TOK_RPAREN) {
+            while (1) {
+                greenc_expr* a = parse_expr(p);
+                if (!a) {
+                    p->failed = 1;
+                    return e;
+                }
+                greenc_expr_args_push(&args, &n, &cap, a);
+                if (p->tok.kind == TOK_COMMA) {
+                    parser_next(p);
+                    continue;
+                }
+                break;
+            }
+        }
+
+        parser_expect(p, TOK_RPAREN);
+
+        greenc_expr* call = greenc_expr_new(GREENC_EXPR_CALL);
+        if (!call) {
+            p->failed = 1;
+            return e;
+        }
+        call->callee = e;
+        call->args = args;
+        call->arg_count = n;
+        e = call;
+    }
+
+    return e;
+}
+
+static greenc_expr* parse_unary(greenc_parser* p) {
+    if (p->tok.kind == TOK_MINUS) {
+        parser_next(p);
+        greenc_expr* inner = parse_unary(p);
+        if (!inner) return NULL;
+        greenc_expr* e = greenc_expr_new(GREENC_EXPR_NEG);
+        if (!e) return NULL;
+        e->inner = inner;
+        return e;
+    }
+    return parse_postfix(p);
+}
+
+static greenc_expr* parse_expr(greenc_parser* p) {
+    return parse_unary(p);
+}
+
+static void parse_stmt(greenc_parser* p, greenc_func* gfunc) {
+    if (p->failed) return;
+
+    if (p->tok.kind == TOK_RETURN) {
+        parser_next(p);
+        greenc_expr* ex = parse_expr(p);
+        if (!ex) {
+            p->failed = 1;
+            return;
+        }
+        parser_expect(p, TOK_SEMI);
+        greenc_stmt* st = greenc_stmt_new(GREENC_STMT_RETURN, ex);
+        if (st) greenc_func_push_stmt(gfunc, st);
         return;
     }
 
-    parser_debug_token(p->tok);
-
-    parser_next(p);
-
+    greenc_expr* ex = parse_expr(p);
+    if (!ex) {
+        p->failed = 1;
+        return;
+    }
     parser_expect(p, TOK_SEMI);
+    greenc_stmt* st = greenc_stmt_new(GREENC_STMT_EXPR, ex);
+    if (st) greenc_func_push_stmt(gfunc, st);
 }
 
-// --------------------------------------------------
-// parse function
-// --------------------------------------------------
-
-// SEARCH: parse_function(
-static void parse_function(greenc_parser* p) {
-
-    // accept: int OR fn
+static greenc_func* parse_function(greenc_parser* p) {
     if (p->tok.kind == TOK_INT || p->tok.kind == TOK_FN) {
         parser_next(p);
     } else {
-        print("parse error: expected function keyword");
-        return;
+        print("parse error: expected int or fn");
+        p->failed = 1;
+        return NULL;
     }
 
-    // function name
     if (p->tok.kind != TOK_IDENT) {
         print("parse error: expected function name");
-        return;
+        p->failed = 1;
+        return NULL;
     }
 
-    print("function: ");
-    parser_debug_token(p->tok);
+    greenc_func* gfunc = (greenc_func*)greenc_malloc(sizeof(greenc_func));
+    if (!gfunc) return NULL;
+    gfunc->name = p->tok;
+    gfunc->stmts = NULL;
+    gfunc->stmt_count = 0;
+    gfunc->stmt_cap = 0;
 
     parser_next(p);
 
     parser_expect(p, TOK_LPAREN);
+    while (p->tok.kind != TOK_RPAREN && p->tok.kind != TOK_EOF) {
+        parser_next(p);
+    }
     parser_expect(p, TOK_RPAREN);
 
     parser_expect(p, TOK_LBRACE);
 
-    // body
-    while (p->tok.kind != TOK_RBRACE &&
-           p->tok.kind != TOK_EOF) {
-
-        if (p->tok.kind == TOK_RETURN) {
-            parse_return(p);
-        } else {
-            // skip unknown tokens for now
-            parser_next(p);
-        }
+    while (p->tok.kind != TOK_RBRACE && p->tok.kind != TOK_EOF) {
+        parse_stmt(p, gfunc);
+        if (p->failed) break;
     }
 
     parser_expect(p, TOK_RBRACE);
+    return gfunc;
 }
 
-// --------------------------------------------------
-// parser entry
-// --------------------------------------------------
-
-// SEARCH: parse_file(
-static void parse_file(
+static greenc_program* greenc_parse_file(
     const char* source,
     greenc_keywords* keywords
 ) {
-    greenc_lexer lexer = { source, 0 };
+    greenc_lexer lexer = {source, 0};
 
     greenc_parser p;
     p.lexer = &lexer;
     p.keywords = keywords;
+    p.failed = 0;
 
     parser_next(&p);
 
-    while (p.tok.kind != TOK_EOF) {
+    greenc_program* program = greenc_program_new();
+    if (!program) return NULL;
 
-        // only function parsing for now
+    while (p.tok.kind != TOK_EOF) {
         if (p.tok.kind == TOK_INT || p.tok.kind == TOK_FN) {
-            parse_function(&p);
+            greenc_func* gfunc = parse_function(&p);
+            if (gfunc && !p.failed) {
+                greenc_program_push_func(program, gfunc);
+            } else {
+                break;
+            }
         } else {
             parser_next(&p);
         }
     }
+
+    if (p.failed) {
+        return NULL;
+    }
+
+    return program;
+}
+
+static void greenc_program_merge(greenc_program* dst, greenc_program* src) {
+    if (!src) {
+        return;
+    }
+
+    for (int i = 0; i < src->func_count; i++) {
+        greenc_program_push_func(dst, src->funcs[i]);
+    }
+
+    greenc_free(src->funcs);
+    greenc_free(src);
 }

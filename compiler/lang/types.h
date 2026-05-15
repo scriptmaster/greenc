@@ -24,6 +24,7 @@ typedef enum {
     TOK_STRING,
     TOK_LPAREN, TOK_RPAREN,
     TOK_LBRACE, TOK_RBRACE,
+    TOK_COMMA,
     TOK_SEMI, TOK_EQ,
     TOK_FN, TOK_LET, TOK_RETURN,
     TOK_ERROR,   // maps to return

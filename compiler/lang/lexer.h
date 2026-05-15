@@ -104,6 +104,8 @@ static inline greenc_token greenc_next_token(
         case '{': return (greenc_token){TOK_LBRACE, "{", 1};
         case '}': return (greenc_token){TOK_RBRACE, "}", 1};
 
+        case ',': return (greenc_token){TOK_COMMA, ",", 1};
+
         case ';': return (greenc_token){TOK_SEMI, ";", 1};
         case '=': return (greenc_token){TOK_EQ, "=", 1};
 

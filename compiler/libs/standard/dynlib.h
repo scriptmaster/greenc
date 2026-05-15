@@ -33,6 +33,13 @@ typedef void* dynlib;
 
 // 4. Sample usage
 /*
+ * llama.bindings.h:
+ * 
+ * bool llama_bind(void* handle) {
+ *   // ... bind all functions in the dll with the loaded handle
+ *   return 0;
+ * }
+ * 
 #include "llama.bindings.h"
 
 int greenc_main(void) {
