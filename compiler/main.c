@@ -42,9 +42,26 @@ static int greenc_compile_and_emit(greenc_args* cli) {
     char* pending_sources[GREENC_PENDING_SOURCES_MAX]; /// stack of raw source buffers still owned until emit finishes
     int pending_sources_n = 0; /// how many slots in pending_sources are filled AST slices point into these
 
-    if (greenc_merge_input_files(cli, &keywords, combined, pending_sources, &pending_sources_n) != 0) { /// parse each file merge AST keep buffers pinned
+    char* main_file = NULL; /// path of first input file that contains main — set during merge
+    if (greenc_merge_input_files(cli, &keywords, combined, pending_sources, &pending_sources_n, &main_file) != 0) { /// parse each file merge AST keep buffers pinned
         return 1; /// parse or merge failed pending and combined freed inside
     }
 
-    return greenc_emit_write_output(cli, combined, pending_sources, pending_sources_n); /// codegen write .c then release all pending source buffers
+    /// derive output name from the file that owns main if -o was not given
+    char* derived_output = NULL;
+    if (!cli->output_file) {
+        if (main_file) {
+            derived_output = greenc_derive_exe_name_from_path(main_file);
+        }
+        cli->output_file = derived_output ? derived_output :
+#ifdef _WIN32
+            "a.exe";
+#else
+            "a.out";
+#endif
+    }
+
+    int ret = greenc_emit_write_output(cli, combined, pending_sources, pending_sources_n); /// codegen write .c then release all pending source buffers
+    greenc_free(derived_output); /// safe to free — output_file pointer no longer used after emit
+    return ret;
 }

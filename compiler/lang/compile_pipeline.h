@@ -54,7 +54,8 @@ static int greenc_merge_append_file( /// read one path parse one TU merge into c
     greenc_keywords* kw, /// shared keyword dict
     greenc_program* combined, /// grows with merged funcs
     char** pending, /// stack to retain source pointers
-    int* pending_n /// in-out count of retained buffers
+    int* pending_n, /// in-out count of retained buffers
+    char** main_file_out /// set to path of first file that contains main (if not already set)
 ) {
     if (*pending_n >= GREENC_PENDING_SOURCES_MAX) { /// stack overflow guard
         print("greenc: too many input files"); /// user limit message
@@ -72,6 +73,17 @@ static int greenc_merge_append_file( /// read one path parse one TU merge into c
         return greenc_merge_abort(combined, pending, *pending_n, NULL); /// source already in pending gets released in abort
     }
 
+    /// detect main before merging while we still know which file it came from
+    if (main_file_out && !*main_file_out) {
+        for (int fi = 0; fi < one->func_count; fi++) {
+            greenc_token n = one->funcs[fi]->name;
+            if (greenc_str_equals(n.start, n.len, "main")) {
+                *main_file_out = path;
+                break;
+            }
+        }
+    }
+
     greenc_program_merge(combined, one); /// steal func pointers into combined free shell of one
     return 0; /// success
 }
@@ -81,7 +93,8 @@ static int greenc_merge_input_files( /// loop all CLI inputs
     greenc_keywords* kw, /// lexer keywords
     greenc_program* combined, /// out merged program
     char** pending, /// stack array from main
-    int* pending_n /// in-out retained source count
+    int* pending_n, /// in-out retained source count
+    char** main_file_out /// set to path of first file that contains main
 ) {
     int processed = 0; /// inputs successfully merged
     *pending_n = 0; /// reset stack before loop
@@ -96,7 +109,7 @@ static int greenc_merge_input_files( /// loop all CLI inputs
             continue; /// skip this input others may succeed
         }
 
-        if (greenc_merge_append_file(path, source, kw, combined, pending, pending_n) != 0) { /// parse merge or overflow
+        if (greenc_merge_append_file(path, source, kw, combined, pending, pending_n, main_file_out) != 0) { /// parse merge or overflow
             return 1; /// abort whole compile
         }
 
@@ -174,7 +187,7 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
         return greenc_emit_abort(combined, pending, pending_n, out_c_path, emitted); /// free emitted and path and pending
     }
 
-    print("wrote:"); /// success label
+    //print("wrote:"); /// success label
     print(out_c_path); /// show final .c path
 
     /// invoke gcc to compile the generated C file into the target binary

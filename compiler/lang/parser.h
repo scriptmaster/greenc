@@ -42,6 +42,7 @@ static greenc_stmt* greenc_stmt_new(greenc_stmt_kind k, greenc_expr* ex) {
     if (!s) return NULL;
     s->kind = k;
     s->expr = ex;
+    s->tok = (greenc_token){TOK_EOF, "", 0};
     return s;
 }
 
@@ -259,6 +260,21 @@ static greenc_expr* parse_unary(greenc_parser* p) {
 static void parse_stmt(greenc_parser* p, greenc_func* gfunc) {
     if (p->failed) return;
 
+    /// handle comment tokens — emit as-is, no parse error
+    if (
+        p->tok.kind == TOK_LINE_COMMENT ||
+        p->tok.kind == TOK_BLOCK_COMMENT ||
+        p->tok.kind == TOK_MARKER_COMMENT
+    ) {
+        greenc_stmt* st = greenc_stmt_new(GREENC_STMT_COMMENT, NULL);
+        if (st) {
+            st->tok = p->tok;
+            greenc_func_push_stmt(gfunc, st);
+        }
+        parser_next(p);
+        return;
+    }
+
     if (p->tok.kind == TOK_RETURN) {
         parser_next(p);
         greenc_expr* ex = parse_expr(p);
@@ -405,6 +421,16 @@ static greenc_program* greenc_parse_file(
     while (p.tok.kind != TOK_EOF) {
         if (p.tok.kind == TOK_HASH_INCLUDE) {
             greenc_program_push_include(program, p.tok);
+            parser_next(&p);
+            continue;
+        }
+
+        /// skip top-level comments gracefully
+        if (
+            p.tok.kind == TOK_LINE_COMMENT ||
+            p.tok.kind == TOK_BLOCK_COMMENT ||
+            p.tok.kind == TOK_MARKER_COMMENT
+        ) {
             parser_next(&p);
             continue;
         }

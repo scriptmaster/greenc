@@ -59,6 +59,28 @@ static char* greenc_replace_suffix_with_c(
     return out;
 }
 
+/// derive "stem.exe" / "stem.elf" from an input path like "examples/comments.c"
+static char* greenc_derive_exe_name_from_path(const char* input_path) {
+    const char* base = greenc_path_basename(input_path);
+    /// find last dot to strip extension
+    const char* dot = NULL;
+    for (const char* p = base; *p; p++) {
+        if (*p == '.') dot = p;
+    }
+    size_t stem_len = dot ? (size_t)(dot - base) : greenc_strlen(base);
+#ifdef _WIN32
+    const char* suffix = ".exe";
+#else
+    const char* suffix = ".elf";
+#endif
+    size_t suf_len = greenc_strlen(suffix);
+    char* out = (char*)greenc_malloc(stem_len + suf_len + 1);
+    if (!out) return NULL;
+    greenc_memcpy(out, base, stem_len);
+    greenc_memcpy(out + stem_len, suffix, suf_len + 1);
+    return out;
+}
+
 static char* greenc_transpile_c_path_for_output(const char* output_file) {
     if (greenc_string_endswith(output_file, ".exe")) {
         return greenc_replace_suffix_with_c(output_file, 4);

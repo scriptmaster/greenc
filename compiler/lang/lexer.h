@@ -84,10 +84,23 @@ static inline greenc_token greenc_next_token(
             return lex_marker_slash(l, start);
         }
 
+        // /* block comment */
+        if (peek(l) == '*') {
+            next(l); /// consume *
+            while (peek(l) != 0) {
+                if (peek(l) == '*' && l->src[l->pos+1] == '/') {
+                    next(l); next(l); /// consume */
+                    break;
+                }
+                next(l);
+            }
+            return (greenc_token){TOK_BLOCK_COMMENT, l->src + start, l->pos - start};
+        }
+
         // // normal comment
         if (peek(l) == '/') {
             while (peek(l) != '\n' && peek(l) != 0) next(l);
-            return greenc_next_token(l, k);
+            return (greenc_token){TOK_LINE_COMMENT, l->src + start, l->pos - start};
         }
 
         return (greenc_token){TOK_SLASH, "/", 1};
@@ -96,25 +109,6 @@ static inline greenc_token greenc_next_token(
     // block comment or marker
     if (c == '*') {
         // not used standalone
-    }
-
-    if (c == '/' && peek(l) == '*') {
-        next(l);
-
-        if (peek(l) == '/' && l->src[l->pos+1] == '/' && l->src[l->pos+2] == '/') {
-            next(l); next(l); next(l);
-            return lex_marker_block(l, start);
-        }
-
-        // normal block comment
-        while (peek(l) != 0) {
-            if (peek(l) == '*' && l->src[l->pos+1] == '/') {
-                next(l); next(l);
-                break;
-            }
-            next(l);
-        }
-        return greenc_next_token(l, k);
     }
 
     // 5. operators + symbols

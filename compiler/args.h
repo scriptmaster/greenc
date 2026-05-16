@@ -115,14 +115,9 @@ static inline greenc_args greenc_args_parse(
         cli.freestanding = 1;
     }
 
-    if (!cli.output_file) {
-
-#ifdef _WIN32
-        cli.output_file = "a.exe";
-#else
-        cli.output_file = "a.out";
-#endif
-    }
+    /// output_file intentionally left NULL when not specified by -o
+    /// greenc_compile_and_emit resolves it after parsing to derive the name
+    /// from whichever input file contains main, falling back to a.exe / a.out
 
     return cli;
 }

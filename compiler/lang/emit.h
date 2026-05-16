@@ -255,6 +255,20 @@ static void greenc_emit_stmt(greenc_emit_buf* b, greenc_stmt* st, int indent) {
         return;
     }
 
+    if (st->kind == GREENC_STMT_COMMENT) {
+        if (st->tok.kind == TOK_MARKER_COMMENT) {
+            /// reconstruct ///  prefix — lex_marker_slash strips it
+            greenc_emit_buf_append_str(b, "/// ");
+            greenc_emit_buf_append_span(b, st->tok.start, st->tok.len);
+        } else {
+            /// TOK_LINE_COMMENT  text already starts with "//"
+            /// TOK_BLOCK_COMMENT text already starts with "/*" and ends with "*/"
+            greenc_emit_buf_append_span(b, st->tok.start, st->tok.len);
+        }
+        greenc_emit_buf_append_char(b, '\n');
+        return;
+    }
+
     greenc_emit_expr(b, st->expr, 0);
     greenc_emit_buf_append_str(b, ";\n");
 }
@@ -420,6 +434,7 @@ static void greenc_emit_greenc_main_wrapper(greenc_emit_buf* b, greenc_func* mai
     int np = (main_func && main_func->params_src)
         ? greenc_count_main_params(main_func->params_src, main_func->params_src_len)
         : 0;
+    int is_void = main_func && main_func->return_type.kind == TOK_VOID;
     greenc_emit_buf_append_str(b, "\n");
     greenc_emit_buf_append_str(b, "/**\n");
     greenc_emit_buf_append_str(b, " * greenc freestanding entry — bridges greenc_start -> user __main\n");
@@ -427,15 +442,35 @@ static void greenc_emit_greenc_main_wrapper(greenc_emit_buf* b, greenc_func* mai
     greenc_emit_buf_append_str(b, "int greenc_main(int argc, char** argv, char** envp) {\n");
     if (np == 0) {
         greenc_emit_buf_append_str(b, "    (void)argc; (void)argv; (void)envp;\n");
-        greenc_emit_buf_append_str(b, "    return __main();\n");
+        if (is_void) {
+            greenc_emit_buf_append_str(b, "    __main();\n");
+            greenc_emit_buf_append_str(b, "    return 0;\n");
+        } else {
+            greenc_emit_buf_append_str(b, "    return __main();\n");
+        }
     } else if (np == 1) {
         greenc_emit_buf_append_str(b, "    (void)argv; (void)envp;\n");
-        greenc_emit_buf_append_str(b, "    return __main(argc);\n");
+        if (is_void) {
+            greenc_emit_buf_append_str(b, "    __main(argc);\n");
+            greenc_emit_buf_append_str(b, "    return 0;\n");
+        } else {
+            greenc_emit_buf_append_str(b, "    return __main(argc);\n");
+        }
     } else if (np == 2) {
         greenc_emit_buf_append_str(b, "    (void)envp;\n");
-        greenc_emit_buf_append_str(b, "    return __main(argc, argv);\n");
+        if (is_void) {
+            greenc_emit_buf_append_str(b, "    __main(argc, argv);\n");
+            greenc_emit_buf_append_str(b, "    return 0;\n");
+        } else {
+            greenc_emit_buf_append_str(b, "    return __main(argc, argv);\n");
+        }
     } else {
-        greenc_emit_buf_append_str(b, "    return __main(argc, argv, envp);\n");
+        if (is_void) {
+            greenc_emit_buf_append_str(b, "    __main(argc, argv, envp);\n");
+            greenc_emit_buf_append_str(b, "    return 0;\n");
+        } else {
+            greenc_emit_buf_append_str(b, "    return __main(argc, argv, envp);\n");
+        }
     }
     greenc_emit_buf_append_str(b, "}\n");
 }
@@ -473,12 +508,12 @@ static char* greenc_emit_program(
         }
     }
 
-    /// if print used and no greenc include, auto-add stdio + define
-    /// if print used and greenc already included, greenc.h owns print — don't redefine
-    int auto_stdio    = (needs_print && !has_greenc && !has_stdio) ? 1 : 0;
-    int emit_define   = (needs_print && !has_greenc) ? 1 : 0;
-    int include_count = pr->include_count + auto_stdio;
-    int define_count  = emit_define ? 1 : 0;
+    /// freestanding (default): auto-include greenc.h when print used and no explicit greenc include
+    /// libc mode (-nogc): fall back to stdio.h
+    int auto_greenc  = (freestanding  && needs_print && !has_greenc) ? 1 : 0;
+    int auto_stdio   = (!freestanding && needs_print && !has_greenc && !has_stdio) ? 1 : 0;
+    int include_count = pr->include_count + auto_greenc + auto_stdio;
+    int define_count  = 0;
     int func_count    = pr->func_count;
 
 
@@ -542,6 +577,16 @@ static char* greenc_emit_program(
             greenc_emit_buf_append_str(&buf, "\n");
         }
     }
+    if (auto_greenc) {
+        greenc_emit_buf_append_str(&buf, "#include \"");
+        if (base_path) {
+            greenc_emit_buf_append_str(&buf, base_path);
+            greenc_emit_buf_append_str(&buf, "/compiler/libs/greenc.h");
+        } else {
+            greenc_emit_buf_append_str(&buf, "greenc.h"); /// fallback
+        }
+        greenc_emit_buf_append_str(&buf, "\"\n");
+    }
     if (auto_stdio) {
         greenc_emit_buf_append_str(&buf, "#include <stdio.h>\n");
     }
@@ -549,9 +594,6 @@ static char* greenc_emit_program(
 
     /// definitions section
     greenc_emit_buf_append_str(&buf, "/**\n * Definitions\n */\n");
-    if (emit_define) {
-        greenc_emit_buf_append_str(&buf, "#define print puts\n");
-    }
     greenc_emit_buf_append_str(&buf, "\n");
 
 

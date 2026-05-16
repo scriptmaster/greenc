@@ -24,7 +24,8 @@ struct greenc_expr {
 
 typedef enum {
     GREENC_STMT_EXPR,
-    GREENC_STMT_RETURN
+    GREENC_STMT_RETURN,
+    GREENC_STMT_COMMENT   /// tok holds the raw comment token
 } greenc_stmt_kind;
 
 typedef struct greenc_stmt greenc_stmt;
@@ -32,6 +33,7 @@ typedef struct greenc_stmt greenc_stmt;
 struct greenc_stmt {
     greenc_stmt_kind kind;
     greenc_expr* expr;
+    greenc_token tok;  /// used by GREENC_STMT_COMMENT
 };
 
 typedef struct {

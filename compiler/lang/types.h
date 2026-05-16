@@ -39,6 +39,8 @@ typedef enum {
     TOK_PERCENT,
     // Markers: ///move
     TOK_MARKER_COMMENT,
+    TOK_LINE_COMMENT,    /// // single-line comment
+    TOK_BLOCK_COMMENT,   /// /* multi-line comment */
     TOK_HASH_INCLUDE,   /// #include <...> or #include "..."
     // Custom tokens Start:
 
