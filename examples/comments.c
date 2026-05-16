@@ -4,8 +4,7 @@
  * doc-style block comment at top level
  */
 
-void main() {
-
+void main() { /// pure
     // single-line inside function
 
     /**
@@ -22,5 +21,6 @@ void main() {
 
     /// triple-slash marker
 
-    print("hello");
+    print("hello"); /// nice
+    //// cool
 }

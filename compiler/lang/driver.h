@@ -71,7 +71,7 @@ static char* greenc_derive_exe_name_from_path(const char* input_path) {
 #ifdef _WIN32
     const char* suffix = ".exe";
 #else
-    const char* suffix = ".elf";
+    const char* suffix = ".out";
 #endif
     size_t suf_len = greenc_strlen(suffix);
     char* out = (char*)greenc_malloc(stem_len + suf_len + 1);
@@ -82,13 +82,19 @@ static char* greenc_derive_exe_name_from_path(const char* input_path) {
 }
 
 static char* greenc_transpile_c_path_for_output(const char* output_file) {
-    if (greenc_string_endswith(output_file, ".exe")) {
-        return greenc_replace_suffix_with_c(output_file, 4);
+    /// strip any extension in the basename — covers .exe .elf .out or anything the user passes
+    const char* base = greenc_path_basename(output_file);
+    const char* dot = NULL;
+    for (const char* p = base; *p; p++) {
+        if (*p == '.') dot = p;
     }
-
-    if (greenc_string_endswith(output_file, ".out")) {
-        return greenc_replace_suffix_with_c(output_file, 4);
+    if (dot) {
+        size_t prefix_len = (size_t)(dot - output_file);
+        char* out = (char*)greenc_malloc(prefix_len + 3); /// prefix + ".c" + NUL
+        if (!out) return NULL;
+        greenc_memcpy(out, output_file, prefix_len);
+        greenc_memcpy(out + prefix_len, ".c", 3);
+        return out;
     }
-
     return greenc_concat(output_file, ".c");
 }

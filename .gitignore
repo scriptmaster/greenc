@@ -1,2 +1,6 @@
 .cache
 main*.exe
+build/
+out/
+a.exe
+*.exe

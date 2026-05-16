@@ -125,6 +125,42 @@ static int greenc_merge_input_files( /// loop all CLI inputs
     return 0; /// merged at least one file
 }
 
+/// create each component of path incrementally so the output dir always exists
+static void greenc_ensure_output_dir(const char* output_file) {
+    char* dir = greenc_dirname_alloc(output_file);
+    if (!dir) return;
+
+    size_t len = greenc_strlen(dir);
+    /// nothing to do for current directory
+    if (len == 0 || (len == 1 && dir[0] == '.')) {
+        greenc_free(dir);
+        return;
+    }
+
+    /// mkdir -p: create each prefix in turn, ignoring intermediate errors
+    char* tmp = (char*)greenc_malloc(len + 1);
+    if (tmp) {
+        greenc_memcpy(tmp, dir, len + 1);
+        for (size_t i = 1; i <= len; i++) {
+            if (i == len || tmp[i] == '/' || tmp[i] == '\\') {
+                char saved = tmp[i];
+                tmp[i] = '\0';
+                greenc_mkdir_one(tmp); /// ignore per-component errors (may already exist)
+                tmp[i] = saved;
+            }
+        }
+        greenc_free(tmp);
+    }
+
+    /// final check: greenc_mkdir_one returns 0 for EEXIST, so -1 means a real failure
+    if (greenc_mkdir_one(dir) != 0) {
+        print("greenc: warning: could not create output directory");
+        print(dir);
+    }
+
+    greenc_free(dir);
+}
+
 static int greenc_emit_write_output( /// resolve output path emit C write disk free pending
     const greenc_args* cli, /// need output_file for cache path and gcc comment
     greenc_program* combined, /// AST to stringify
@@ -189,6 +225,8 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
 
     //print("wrote:"); /// success label
     print(out_c_path); /// show final .c path
+
+    greenc_ensure_output_dir(cli->output_file); /// create -o target directory if needed
 
     /// invoke gcc to compile the generated C file into the target binary
     char* gcc_cmd = greenc_concat("gcc -o ", cli->output_file, " ", gcc_arg, " ", gcc_flags);
