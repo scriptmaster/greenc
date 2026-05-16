@@ -29,6 +29,7 @@ typedef enum {
     TOK_FN, TOK_LET, TOK_RETURN,
     TOK_ERROR,   // maps to return
     // C types
+    TOK_VOID,
     TOK_INT, TOK_FLOAT, TOK_BOOL,
     // Operators
     TOK_PLUS,
@@ -38,6 +39,7 @@ typedef enum {
     TOK_PERCENT,
     // Markers: ///move
     TOK_MARKER_COMMENT,
+    TOK_HASH_INCLUDE,   /// #include <...> or #include "..."
     // Custom tokens Start:
 
     // Custom tokens End.

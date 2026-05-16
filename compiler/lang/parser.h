@@ -51,8 +51,26 @@ static greenc_program* greenc_program_new(void) {
     pr->funcs = NULL;
     pr->func_count = 0;
     pr->func_cap = 0;
+    pr->includes = NULL;
+    pr->include_count = 0;
+    pr->include_cap = 0;
     return pr;
 }
+
+static void greenc_program_push_include(greenc_program* pr, greenc_token tok) {
+    if (pr->include_count >= pr->include_cap) {
+        int ncap = pr->include_cap ? pr->include_cap * 2 : 4;
+        greenc_token* ni = (greenc_token*)greenc_malloc(sizeof(greenc_token) * (size_t)ncap);
+        if (!ni) return;
+        for (int i = 0; i < pr->include_count; i++) ni[i] = pr->includes[i];
+        greenc_free(pr->includes);
+        pr->includes = ni;
+        pr->include_cap = ncap;
+    }
+    pr->includes[pr->include_count++] = tok;
+}
+
+
 
 static void greenc_func_push_stmt(greenc_func* gfunc, greenc_stmt* st) {
     if (gfunc->stmt_count >= gfunc->stmt_cap) {
@@ -105,6 +123,44 @@ static void greenc_expr_args_push(
 }
 
 static greenc_expr* parse_expr(greenc_parser* p);
+static greenc_expr* parse_unary(greenc_parser* p);
+
+static int parse_is_binop(greenc_tok_kind k) {
+    return k == TOK_PLUS || k == TOK_MINUS || k == TOK_STAR || k == TOK_SLASH || k == TOK_PERCENT;
+}
+
+static int parse_binop_prec(greenc_tok_kind k) {
+    if (k == TOK_STAR || k == TOK_SLASH || k == TOK_PERCENT) return 2;
+    if (k == TOK_PLUS || k == TOK_MINUS) return 1;
+    return 0;
+}
+
+static greenc_expr* parse_binop_rhs(greenc_parser* p, greenc_expr* lhs, int min_prec) {
+    while (parse_is_binop(p->tok.kind) && parse_binop_prec(p->tok.kind) >= min_prec) {
+        greenc_token op = p->tok;
+        int prec = parse_binop_prec(op.kind);
+        parser_next(p);
+        greenc_expr* rhs = parse_unary(p);
+        if (!rhs || p->failed) return lhs;
+        while (parse_is_binop(p->tok.kind) && parse_binop_prec(p->tok.kind) > prec) {
+            rhs = parse_binop_rhs(p, rhs, prec + 1);
+            if (!rhs || p->failed) return lhs;
+        }
+        greenc_expr* bin = greenc_expr_new(GREENC_EXPR_BINOP);
+        if (!bin) return lhs;
+        bin->tok = op;    /// operator token
+        bin->inner = lhs; /// left side
+        bin->callee = rhs; /// right side
+        lhs = bin;
+    }
+    return lhs;
+}
+
+static greenc_expr* parse_expr(greenc_parser* p) {
+    greenc_expr* lhs = parse_unary(p);
+    if (!lhs || p->failed) return lhs;
+    return parse_binop_rhs(p, lhs, 1);
+}
 
 static greenc_expr* parse_primary(greenc_parser* p) {
     if (p->failed) return NULL;
@@ -200,10 +256,6 @@ static greenc_expr* parse_unary(greenc_parser* p) {
     return parse_postfix(p);
 }
 
-static greenc_expr* parse_expr(greenc_parser* p) {
-    return parse_unary(p);
-}
-
 static void parse_stmt(greenc_parser* p, greenc_func* gfunc) {
     if (p->failed) return;
 
@@ -220,6 +272,56 @@ static void parse_stmt(greenc_parser* p, greenc_func* gfunc) {
         return;
     }
 
+    if (p->tok.kind == TOK_IDENT) {
+        greenc_token ident = p->tok;
+        parser_next(p);
+
+        if (p->tok.kind == TOK_LPAREN) {
+            parser_next(p);
+            greenc_expr** args = NULL;
+            int n = 0;
+            int cap = 0;
+
+            if (p->tok.kind != TOK_RPAREN) {
+                while (1) {
+                    greenc_expr* a = parse_expr(p);
+                    if (!a) {
+                        p->failed = 1;
+                        return;
+                    }
+                    greenc_expr_args_push(&args, &n, &cap, a);
+                    if (p->tok.kind == TOK_COMMA) {
+                        parser_next(p);
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            parser_expect(p, TOK_RPAREN);
+            greenc_expr* callee = greenc_expr_new(GREENC_EXPR_IDENT);
+            if (!callee) {
+                p->failed = 1;
+                return;
+            }
+            callee->tok = ident;
+            greenc_expr* call = greenc_expr_new(GREENC_EXPR_CALL);
+            if (!call) {
+                p->failed = 1;
+                return;
+            }
+            call->callee = callee;
+            call->args = args;
+            call->arg_count = n;
+            parser_expect(p, TOK_SEMI);
+            greenc_stmt* st = greenc_stmt_new(GREENC_STMT_EXPR, call);
+            if (st) greenc_func_push_stmt(gfunc, st);
+            return;
+        }
+
+        p->tok = ident;
+    }
+
     greenc_expr* ex = parse_expr(p);
     if (!ex) {
         p->failed = 1;
@@ -231,13 +333,15 @@ static void parse_stmt(greenc_parser* p, greenc_func* gfunc) {
 }
 
 static greenc_func* parse_function(greenc_parser* p) {
-    if (p->tok.kind == TOK_INT || p->tok.kind == TOK_FN) {
-        parser_next(p);
-    } else {
-        print("parse error: expected int or fn");
+    if (p->tok.kind != TOK_VOID && p->tok.kind != TOK_INT && p->tok.kind != TOK_FN) {
+        print("parse error: expected return type or fn");
         p->failed = 1;
         return NULL;
     }
+
+    greenc_token return_type = p->tok; /// capture return type before advancing
+
+    parser_next(p); /// now pointing at function name
 
     if (p->tok.kind != TOK_IDENT) {
         print("parse error: expected function name");
@@ -245,9 +349,15 @@ static greenc_func* parse_function(greenc_parser* p) {
         return NULL;
     }
 
+    greenc_token name = p->tok; /// capture function name
+
+
     greenc_func* gfunc = (greenc_func*)greenc_malloc(sizeof(greenc_func));
     if (!gfunc) return NULL;
-    gfunc->name = p->tok;
+    gfunc->name = name;
+    gfunc->return_type = return_type;
+    gfunc->params_src = NULL;
+    gfunc->params_src_len = 0;
     gfunc->stmts = NULL;
     gfunc->stmt_count = 0;
     gfunc->stmt_cap = 0;
@@ -255,9 +365,13 @@ static greenc_func* parse_function(greenc_parser* p) {
     parser_next(p);
 
     parser_expect(p, TOK_LPAREN);
+    gfunc->params_src = p->tok.start; /// start of first token inside (
+    const char* params_end = p->tok.start;
     while (p->tok.kind != TOK_RPAREN && p->tok.kind != TOK_EOF) {
+        params_end = p->tok.start + p->tok.len;
         parser_next(p);
     }
+    gfunc->params_src_len = (int)(params_end - gfunc->params_src);
     parser_expect(p, TOK_RPAREN);
 
     parser_expect(p, TOK_LBRACE);
@@ -275,6 +389,7 @@ static greenc_program* greenc_parse_file(
     const char* source,
     greenc_keywords* keywords
 ) {
+
     greenc_lexer lexer = {source, 0};
 
     greenc_parser p;
@@ -288,16 +403,23 @@ static greenc_program* greenc_parse_file(
     if (!program) return NULL;
 
     while (p.tok.kind != TOK_EOF) {
-        if (p.tok.kind == TOK_INT || p.tok.kind == TOK_FN) {
+        if (p.tok.kind == TOK_HASH_INCLUDE) {
+            greenc_program_push_include(program, p.tok);
+            parser_next(&p);
+            continue;
+        }
+
+        if (p.tok.kind == TOK_VOID || p.tok.kind == TOK_INT || p.tok.kind == TOK_FN) {
             greenc_func* gfunc = parse_function(&p);
             if (gfunc && !p.failed) {
                 greenc_program_push_func(program, gfunc);
-            } else {
-                break;
+                continue;
             }
-        } else {
-            parser_next(&p);
+
+            break;
         }
+
+        parser_next(&p);
     }
 
     if (p.failed) {
@@ -312,10 +434,15 @@ static void greenc_program_merge(greenc_program* dst, greenc_program* src) {
         return;
     }
 
+    for (int i = 0; i < src->include_count; i++) {
+        greenc_program_push_include(dst, src->includes[i]);
+    }
+
     for (int i = 0; i < src->func_count; i++) {
         greenc_program_push_func(dst, src->funcs[i]);
     }
 
+    greenc_free(src->includes);
     greenc_free(src->funcs);
     greenc_free(src);
 }

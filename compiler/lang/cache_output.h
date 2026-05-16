@@ -27,9 +27,43 @@ static int greenc_path_is_absolute(const char* p) {
 #endif
 }
 
+static char* greenc_normalize_cache_path_alloc(const char* path) {
+    size_t n = greenc_strlen(path);
+    char* out = (char*)greenc_malloc(n + 1);
+
+    if (!out) {
+        return NULL;
+    }
+
+    size_t j = 0;
+    int prev_sep = 0;
+
+    for (size_t i = 0; i < n; i++) {
+        char c = path[i];
+
+        if (c == '/' || c == '\\') {
+            if (!prev_sep) {
+                out[j++] = '/';
+                prev_sep = 1;
+            }
+            continue;
+        }
+
+        prev_sep = 0;
+        out[j++] = c;
+    }
+
+    if (j > 1 && out[j - 1] == '/') {
+        j--;
+    }
+
+    out[j] = '\0';
+    return out;
+}
+
 static char* greenc_output_exe_abs_path_alloc(const char* output_exe) {
     if (greenc_path_is_absolute(output_exe)) {
-        return greenc_concat(output_exe, "");
+        return greenc_normalize_cache_path_alloc(output_exe);
     }
 
     char* cwd = greenc_getcwd_alloc();
@@ -39,9 +73,11 @@ static char* greenc_output_exe_abs_path_alloc(const char* output_exe) {
     }
 
     char* out = greenc_concat(cwd, "/", output_exe);
+    char* normalized = out ? greenc_normalize_cache_path_alloc(out) : NULL;
 
     greenc_free(cwd);
-    return out;
+    greenc_free(out);
+    return normalized;
 }
 
 static char* greenc_home_dir_alloc(void) {
@@ -184,19 +220,39 @@ static char* greenc_resolve_emit_c_output_paths(
         return NULL;
     }
 
-    char* full = greenc_try_cache_greenc_tree(cwd, abs_out, cbase, gcc_arg_out, 1);
+    char* normalized_cwd = greenc_normalize_cache_path_alloc(cwd);
+
+    if (!normalized_cwd) {
+        greenc_free(cwd);
+        greenc_free(cbase);
+        greenc_free(abs_out);
+        return NULL;
+    }
+
+    char* full = greenc_try_cache_greenc_tree(normalized_cwd, abs_out, cbase, gcc_arg_out, 0);
 
     if (!full) {
         char* home = greenc_home_dir_alloc();
 
         if (home) {
-            full = greenc_try_cache_greenc_tree(home, abs_out, cbase, gcc_arg_out, 0);
+            char* normalized_home = greenc_normalize_cache_path_alloc(home);
+
+            if (normalized_home) {
+                full = greenc_try_cache_greenc_tree(normalized_home, abs_out, cbase, gcc_arg_out, 1);
+                greenc_free(normalized_home);
+            }
+
             greenc_free(home);
         }
     }
 
+    greenc_free(normalized_cwd);
+
+    char* normalized = full ? greenc_normalize_cache_path_alloc(full) : NULL;
+
+    greenc_free(full);
     greenc_free(cwd);
     greenc_free(cbase);
     greenc_free(abs_out);
-    return full;
+    return normalized;
 }

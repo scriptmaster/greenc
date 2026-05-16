@@ -226,6 +226,14 @@ static void greenc_emit_expr(greenc_emit_buf* b, greenc_expr* e, int depth) {
             greenc_emit_buf_append_str(b, ")");
             break;
 
+        case GREENC_EXPR_BINOP:
+            greenc_emit_expr(b, e->inner, depth + 1);  /// left
+            greenc_emit_buf_append_str(b, " ");
+            greenc_emit_buf_append_span(b, e->tok.start, e->tok.len); /// operator
+            greenc_emit_buf_append_str(b, " ");
+            greenc_emit_expr(b, e->callee, depth + 1); /// right
+            break;
+
         default:
             break;
     }
@@ -251,14 +259,117 @@ static void greenc_emit_stmt(greenc_emit_buf* b, greenc_stmt* st, int indent) {
     greenc_emit_buf_append_str(b, ";\n");
 }
 
-static void greenc_emit_func(greenc_emit_buf* b, greenc_func* gfunc) {
+static void greenc_emit_doc_params(greenc_emit_buf* b, const char* src, int len) {
+    /// trim whitespace
+    int s = 0, e = len;
+    while (s < e && (src[s] == ' ' || src[s] == '\t' || src[s] == '\n' || src[s] == '\r')) s++;
+    while (e > s && (src[e-1] == ' ' || src[e-1] == '\t' || src[e-1] == '\n' || src[e-1] == '\r')) e--;
+
+    /// treat empty or bare "void" as no params
+    int is_void = (e - s == 4)
+        && src[s]=='v' && src[s+1]=='o' && src[s+2]=='i' && src[s+3]=='d';
+
+    if (s >= e || is_void) {
+        greenc_emit_buf_append_str(b, " * parameters: none\n");
+        return;
+    }
+
+    greenc_emit_buf_append_str(b, " * parameters:\n");
+
+    int i = s;
+    while (i <= e) {
+        /// find next comma or end
+        int j = i;
+        while (j < e && src[j] != ',') j++;
+
+        /// trim param token edges
+        int ps = i, pe = j;
+        while (ps < pe && (src[ps] == ' ' || src[ps] == '\t')) ps++;
+        while (pe > ps && (src[pe-1] == ' ' || src[pe-1] == '\t')) pe--;
+
+        if (ps < pe) {
+            /// find last whitespace or * to split type from name
+            int split = pe - 1;
+            while (split > ps && src[split] != ' ' && src[split] != '\t' && src[split] != '*') split--;
+
+            if (split > ps) {
+                int name_s = split + 1;
+                int type_e = split;
+                while (type_e > ps && (src[type_e-1] == ' ' || src[type_e-1] == '\t')) type_e--;
+                greenc_emit_buf_append_str(b, " *   ");
+                greenc_emit_buf_append_span(b, src + name_s, pe - name_s); /// name
+                greenc_emit_buf_append_str(b, ": ");
+                greenc_emit_buf_append_span(b, src + ps, type_e - ps);     /// type
+                greenc_emit_buf_append_str(b, "\n");
+            } else {
+                greenc_emit_buf_append_str(b, " *   ");
+                greenc_emit_buf_append_span(b, src + ps, pe - ps);
+                greenc_emit_buf_append_str(b, "\n");
+            }
+        }
+
+        if (j >= e) break;
+        i = j + 1;
+    }
+}
+
+/// returns 1 if the name span is exactly "main"
+static inline int greenc_name_is_main(const char* s, int n) {
+    return n == 4 && s[0]=='m' && s[1]=='a' && s[2]=='i' && s[3]=='n';
+}
+
+/// emits function name, renaming "main" to "__main" when freestanding
+static inline void greenc_emit_func_name(greenc_emit_buf* b, greenc_token name, int freestanding) {
+    if (freestanding && greenc_name_is_main(name.start, name.len)) {
+        greenc_emit_buf_append_str(b, "__main");
+    } else {
+        greenc_emit_buf_append_span(b, name.start, name.len);
+    }
+}
+
+static void greenc_emit_func(greenc_emit_buf* b, greenc_func* gfunc, int freestanding) {
     if (!gfunc || !b->str) {
         return;
     }
 
-    greenc_emit_buf_append_str(b, "int ");
-    greenc_emit_buf_append_span(b, gfunc->name.start, gfunc->name.len);
-    greenc_emit_buf_append_str(b, "(void) {\n");
+    /// resolve return type span
+    const char* ret_src = (gfunc->return_type.start && gfunc->return_type.len > 0)
+        ? gfunc->return_type.start : "int";
+    int ret_len = (gfunc->return_type.start && gfunc->return_type.len > 0)
+        ? gfunc->return_type.len : 3;
+
+    /// emit doc comment
+    greenc_emit_buf_append_str(b, "/**\n");
+    greenc_emit_buf_append_str(b, " * function: ");
+    greenc_emit_func_name(b, gfunc->name, freestanding);
+    greenc_emit_buf_append_str(b, "\n");
+    greenc_emit_buf_append_str(b, " * return_type: ");
+    greenc_emit_buf_append_span(b, ret_src, ret_len);
+    greenc_emit_buf_append_str(b, "\n");
+    greenc_emit_doc_params(b, gfunc->params_src, gfunc->params_src_len);
+    greenc_emit_buf_append_str(b, " */\n");
+
+    /// emit signature — empty params use () not (void)
+    greenc_emit_buf_append_span(b, ret_src, ret_len);
+    greenc_emit_buf_append_str(b, " ");
+    greenc_emit_func_name(b, gfunc->name, freestanding);
+    greenc_emit_buf_append_str(b, "(");
+
+    if (gfunc->params_src && gfunc->params_src_len > 0) {
+        /// check if bare "void"
+        const char* p = gfunc->params_src;
+        int pl = gfunc->params_src_len;
+        int ps = 0, pe = pl;
+        while (ps < pe && (p[ps] == ' ' || p[ps] == '\t')) ps++;
+        while (pe > ps && (p[pe-1] == ' ' || p[pe-1] == '\t')) pe--;
+        int is_void = (pe - ps == 4)
+            && p[ps]=='v' && p[ps+1]=='o' && p[ps+2]=='i' && p[ps+3]=='d';
+        if (!is_void) {
+            greenc_emit_buf_append_span(b, gfunc->params_src, gfunc->params_src_len);
+        }
+    }
+
+    greenc_emit_buf_append_str(b, ") {\n");
 
     for (int i = 0; i < gfunc->stmt_count; i++) {
         greenc_emit_stmt(b, gfunc->stmts[i], 4);
@@ -267,10 +378,75 @@ static void greenc_emit_func(greenc_emit_buf* b, greenc_func* gfunc) {
     greenc_emit_buf_append_str(b, "}\n");
 }
 
+
+static void greenc_emit_buf_append_int(greenc_emit_buf* b, int n) {
+    if (n == 0) { greenc_emit_buf_append_str(b, "0"); return; }
+    char tmp[32];
+    int i = 0;
+    if (n < 0) { greenc_emit_buf_append_str(b, "-"); n = -n; }
+    while (n > 0) { tmp[i++] = (char)('0' + n % 10); n /= 10; }
+    char rev[32];
+    for (int j = 0; j < i; j++) rev[j] = tmp[i - 1 - j];
+    greenc_emit_buf_append_span(b, rev, i);
+}
+
+static void greenc_emit_forward_decl(greenc_emit_buf* b, greenc_func* gfunc, int freestanding);
+
+static int greenc_include_is_stdio(const char* s, int n) {
+    return greenc_str_equals(s, n, "<stdio.h>");
+}
+
+static int greenc_include_is_greenc(const char* s, int n) {
+    return greenc_str_equals(s, n, "<greenc>")
+        || greenc_str_equals(s, n, "<greenc.h>")
+        || greenc_str_equals(s, n, "\"greenc.h\"");
+}
+
+/// count how many parameters user's main() declares (0 if empty/void)
+static int greenc_count_main_params(const char* src, int len) {
+    if (!src || len == 0) return 0;
+    int s = 0, e = len;
+    while (s < e && (src[s]==' ' || src[s]=='\t' || src[s]=='\n')) s++;
+    while (e > s && (src[e-1]==' ' || src[e-1]=='\t' || src[e-1]=='\n')) e--;
+    if (e <= s) return 0;
+    if ((e-s)==4 && src[s]=='v' && src[s+1]=='o' && src[s+2]=='i' && src[s+3]=='d') return 0;
+    int commas = 0;
+    for (int i = s; i < e; i++) { if (src[i]==',') commas++; }
+    return commas + 1;
+}
+
+/// emit greenc_main wrapper that calls user __main() with the right number of args
+static void greenc_emit_greenc_main_wrapper(greenc_emit_buf* b, greenc_func* main_func) {
+    int np = (main_func && main_func->params_src)
+        ? greenc_count_main_params(main_func->params_src, main_func->params_src_len)
+        : 0;
+    greenc_emit_buf_append_str(b, "\n");
+    greenc_emit_buf_append_str(b, "/**\n");
+    greenc_emit_buf_append_str(b, " * greenc freestanding entry — bridges greenc_start -> user __main\n");
+    greenc_emit_buf_append_str(b, " */\n");
+    greenc_emit_buf_append_str(b, "int greenc_main(int argc, char** argv, char** envp) {\n");
+    if (np == 0) {
+        greenc_emit_buf_append_str(b, "    (void)argc; (void)argv; (void)envp;\n");
+        greenc_emit_buf_append_str(b, "    return __main();\n");
+    } else if (np == 1) {
+        greenc_emit_buf_append_str(b, "    (void)argv; (void)envp;\n");
+        greenc_emit_buf_append_str(b, "    return __main(argc);\n");
+    } else if (np == 2) {
+        greenc_emit_buf_append_str(b, "    (void)envp;\n");
+        greenc_emit_buf_append_str(b, "    return __main(argc, argv);\n");
+    } else {
+        greenc_emit_buf_append_str(b, "    return __main(argc, argv, envp);\n");
+    }
+    greenc_emit_buf_append_str(b, "}\n");
+}
+
 static char* greenc_emit_program(
     greenc_program* pr,
     const char* gcc_source_path,
-    const char* output_exe_path
+    const char* output_exe_path,
+    const char* base_path,
+    const char* gcc_flags,  /// full flags string e.g. "-std=c17 -s" or "-std=c17 -s -static-libgcc ..."
+    int freestanding         /// 1 = rename main→greenc_main and emit GREENC_MAIN define
 ) {
     if (!pr || !gcc_source_path || !output_exe_path) {
         return NULL;
@@ -281,32 +457,136 @@ static char* greenc_emit_program(
 
     int needs_print = greenc_emit_program_uses_print(pr);
 
-    greenc_emit_buf_append_str(&buf, "/* gcc -o ");
+    /// check if source already has a greenc include
+    int has_greenc = 0;
+    for (int i = 0; i < pr->include_count; i++) {
+        if (greenc_include_is_greenc(pr->includes[i].start, pr->includes[i].len)) {
+            has_greenc = 1;
+            break;
+        }
+    }
+    int has_stdio = 0;
+    for (int i = 0; i < pr->include_count; i++) {
+        if (greenc_include_is_stdio(pr->includes[i].start, pr->includes[i].len)) {
+            has_stdio = 1;
+            break;
+        }
+    }
+
+    /// if print used and no greenc include, auto-add stdio + define
+    /// if print used and greenc already included, greenc.h owns print — don't redefine
+    int auto_stdio    = (needs_print && !has_greenc && !has_stdio) ? 1 : 0;
+    int emit_define   = (needs_print && !has_greenc) ? 1 : 0;
+    int include_count = pr->include_count + auto_stdio;
+    int define_count  = emit_define ? 1 : 0;
+    int func_count    = pr->func_count;
+
+
+
+    /// find entry point
+    greenc_token entry = {TOK_EOF, NULL, 0};
+    for (int i = 0; i < pr->func_count; i++) {
+        if (greenc_str_equals(pr->funcs[i]->name.start, pr->funcs[i]->name.len, "main")) {
+            entry = pr->funcs[i]->name;
+            break;
+        }
+    }
+
+    /// gcc hint comment — multi-line block
+    greenc_emit_buf_append_str(&buf, "/*\n");
+    greenc_emit_buf_append_str(&buf, "gcc -o ");
     greenc_emit_buf_append_str(&buf, output_exe_path);
     greenc_emit_buf_append_str(&buf, " ");
     greenc_emit_buf_append_str(&buf, gcc_source_path);
-    greenc_emit_buf_append_str(&buf, " -std=c17 */\n");
-
+    greenc_emit_buf_append_str(&buf, " ");
+    greenc_emit_buf_append_str(&buf, gcc_flags ? gcc_flags : "-std=c17 -s");
+    greenc_emit_buf_append_str(&buf, "\n*/\n");
     greenc_emit_buf_append_str(&buf, "\n");
 
-    if (needs_print) {
-        greenc_emit_buf_append_str(&buf, "#define print puts\n");
+    /// table of contents
+    greenc_emit_buf_append_str(&buf, "/**\n");
+    greenc_emit_buf_append_str(&buf, " * Table of Contents:\n");
+    greenc_emit_buf_append_str(&buf, " *  Includes: ");    greenc_emit_buf_append_int(&buf, include_count); greenc_emit_buf_append_str(&buf, "\n");
+    greenc_emit_buf_append_str(&buf, " *  Definitions: ");  greenc_emit_buf_append_int(&buf, define_count);  greenc_emit_buf_append_str(&buf, "\n");
+    greenc_emit_buf_append_str(&buf, " *  Declarations: 0\n");
+    greenc_emit_buf_append_str(&buf, " *  Functions: ");    greenc_emit_buf_append_int(&buf, func_count);    greenc_emit_buf_append_str(&buf, "\n");
+    greenc_emit_buf_append_str(&buf, " *  Start/Entry: ");
+    if (entry.start) {
+        greenc_emit_buf_append_span(&buf, entry.start, entry.len);
+    } else {
+        greenc_emit_buf_append_str(&buf, "none");
     }
-
+    greenc_emit_buf_append_str(&buf, "\n");
+    greenc_emit_buf_append_str(&buf, " *  Warnings: 0\n");
+    greenc_emit_buf_append_str(&buf, " */\n");
     greenc_emit_buf_append_str(&buf, "\n");
 
-    if (needs_print) {
+    /// includes section
+    greenc_emit_buf_append_str(&buf, "/**\n * All Includes first\n */\n");
+    for (int i = 0; i < pr->include_count; i++) {
+        const char* s = pr->includes[i].start;
+        int n = pr->includes[i].len;
+        if (greenc_include_is_greenc(s, n)) {
+            /// resolve greenc include to full path
+            greenc_emit_buf_append_str(&buf, "#include \"");
+            if (base_path) {
+                greenc_emit_buf_append_str(&buf, base_path);
+                greenc_emit_buf_append_str(&buf, "/compiler/libs/greenc.h");
+            } else {
+                greenc_emit_buf_append_str(&buf, "greenc.h"); /// fallback
+            }
+            greenc_emit_buf_append_str(&buf, "\"\n");
+        } else {
+            greenc_emit_buf_append_str(&buf, "#include ");
+            greenc_emit_buf_append_span(&buf, s, n);
+            greenc_emit_buf_append_str(&buf, "\n");
+        }
+    }
+    if (auto_stdio) {
         greenc_emit_buf_append_str(&buf, "#include <stdio.h>\n");
     }
-
     greenc_emit_buf_append_str(&buf, "\n");
 
+    /// definitions section
+    greenc_emit_buf_append_str(&buf, "/**\n * Definitions\n */\n");
+    if (emit_define) {
+        greenc_emit_buf_append_str(&buf, "#define print puts\n");
+    }
+    greenc_emit_buf_append_str(&buf, "\n");
+
+
+    /// declarations section: type declarations only (no forward funcs counted)
+    /// === Type Declarations ===
+    /// (none — omitted when no custom types)
+
+    /// === Forward Declarations === (auto-generated, not counted in ToC)
+    greenc_emit_buf_append_str(&buf, "/**\n * Declarations\n */\n");
+    greenc_emit_buf_append_str(&buf, "\n");
+    greenc_emit_buf_append_str(&buf, "/* === Forward Declarations === */\n");
+    for (int i = 0; i < pr->func_count; i++) {
+        greenc_emit_forward_decl(&buf, pr->funcs[i], freestanding);
+    }
+    greenc_emit_buf_append_str(&buf, "\n");
+
+
+    /// functions
     for (int i = 0; i < pr->func_count; i++) {
         if (i > 0) {
             greenc_emit_buf_append_str(&buf, "\n");
         }
+        greenc_emit_func(&buf, pr->funcs[i], freestanding);
+    }
 
-        greenc_emit_func(&buf, pr->funcs[i]);
+    /// freestanding: emit greenc_main wrapper at the end calling user's main
+    if (freestanding) {
+        greenc_func* main_func = NULL;
+        for (int i = 0; i < pr->func_count; i++) {
+            if (greenc_name_is_main(pr->funcs[i]->name.start, pr->funcs[i]->name.len)) {
+                main_func = pr->funcs[i];
+                break;
+            }
+        }
+        greenc_emit_greenc_main_wrapper(&buf, main_func);
     }
 
     if (!buf.str) {
@@ -314,4 +594,29 @@ static char* greenc_emit_program(
     }
 
     return buf.str;
+}
+
+static void greenc_emit_forward_decl(greenc_emit_buf* b, greenc_func* gfunc, int freestanding) {
+    /// return type
+    if (gfunc->return_type.start && gfunc->return_type.len > 0) {
+        greenc_emit_buf_append_span(b, gfunc->return_type.start, gfunc->return_type.len);
+    } else {
+        greenc_emit_buf_append_str(b, "int");
+    }
+    greenc_emit_buf_append_str(b, " ");
+    greenc_emit_func_name(b, gfunc->name, freestanding);
+    greenc_emit_buf_append_str(b, "(");
+    if (gfunc->params_src && gfunc->params_src_len > 0) {
+        const char* p = gfunc->params_src;
+        int pl = gfunc->params_src_len;
+        int ps = 0, pe = pl;
+        while (ps < pe && (p[ps] == ' ' || p[ps] == '\t')) ps++;
+        while (pe > ps && (p[pe-1] == ' ' || p[pe-1] == '\t')) pe--;
+        int is_void = (pe - ps == 4)
+            && p[ps]=='v' && p[ps+1]=='o' && p[ps+2]=='i' && p[ps+3]=='d';
+        if (!is_void) {
+            greenc_emit_buf_append_span(b, gfunc->params_src, gfunc->params_src_len);
+        }
+    }
+    greenc_emit_buf_append_str(b, ");\n");
 }

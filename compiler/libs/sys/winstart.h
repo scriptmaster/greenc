@@ -1,4 +1,4 @@
-#ifdef _WIN32
+#if defined(_WIN32) && defined(GREENC_MAIN)
 
 #include <windows.h>
 #include "sys_write.h"

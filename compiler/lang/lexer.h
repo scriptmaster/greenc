@@ -53,7 +53,30 @@ static inline greenc_token greenc_next_token(
         return greenc_resolve_ident(k, tok);
     }
 
-    // 4. slashes
+    // 4. # directives
+    if (c == '#') {
+        while (peek(l) == ' ' || peek(l) == '\t') next(l); /// skip spaces after #
+        if (greenc_str_equals(l->src + l->pos, 7, "include")) {
+            char after = l->src[l->pos + 7];
+            if (after == ' ' || after == '\t' || after == '<' || after == '"') {
+                l->pos += 7;
+                while (peek(l) == ' ' || peek(l) == '\t') next(l); /// skip spaces before path
+                int path_start = l->pos;
+                char open = l->src[l->pos];
+                if (open == '<' || open == '"') {
+                    char close = (open == '<') ? '>' : '"';
+                    next(l); /// consume opening delimiter
+                    while (peek(l) != close && peek(l) != 0 && peek(l) != '\n') next(l);
+                    if (peek(l) == close) next(l); /// consume closing delimiter
+                }
+                return (greenc_token){TOK_HASH_INCLUDE, l->src + path_start, l->pos - path_start};
+            }
+        }
+        while (peek(l) != '\n' && peek(l) != 0) next(l); /// skip unknown # directive
+        return greenc_next_token(l, k);
+    }
+
+    // 5. slashes
     if (c == '/') {
         // ///marker
         if (peek(l) == '/' && l->src[l->pos+1] == '/') {

@@ -1,7 +1,7 @@
 //#pragma file "compiler/libs/sys/start.h"
 #pragma once
 
-#ifdef __linux__
+#if defined(__linux__) && defined(GREENC_MAIN)
 
 #include "exit.h"
 
@@ -60,13 +60,13 @@ void _start() {
 #endif
 
 
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(GREENC_MAIN)
 int main(int argc, char** argv, char** envp) {
     return greenc_main(argc, argv, envp);
 }
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(GREENC_MAIN)
 
 #include "winstart.h"
 

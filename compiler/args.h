@@ -14,6 +14,8 @@ typedef struct {
     string_list input_files;
     char* output_file;
     greenc_opt_level optimize_level;
+    int strip;        /// -s: strip symbols (passed to gcc as -s)
+    int freestanding; /// -gc / -nolibc / -greenc / -nostdlib / -ffreestanding / -fno-builtin / -static-libgcc
     int error;
 } greenc_args;
 
@@ -76,6 +78,34 @@ static inline greenc_args greenc_args_parse(
 
         if (greenc_streq(opt, "-O3")) {
             cli.optimize_level = OPT_O3;
+            continue;
+        }
+
+        // -------------------------
+        // strip symbols
+        // -------------------------
+        if (greenc_streq(opt, "-s")) {
+            cli.strip = 1;
+            continue;
+        }
+
+        // -------------------------
+        // freestanding / no-libc modes
+        //   -gc | -nolibc | -greenc  : high-level aliases
+        //   -nostdlib                : expands to full freestanding set
+        //   -ffreestanding           : expands to full freestanding set
+        //   -fno-builtin             : expands to full freestanding set
+        //   -static-libgcc           : expands to full freestanding set
+        // -------------------------
+        if (greenc_streq(opt, "-gc")          ||
+            greenc_streq(opt, "-nolibc")      ||
+            greenc_streq(opt, "-greenc")      ||
+            greenc_streq(opt, "-nostdlib")    ||
+            greenc_streq(opt, "-ffreestanding") ||
+            greenc_streq(opt, "-fno-builtin") ||
+            greenc_streq(opt, "-static-libgcc")
+        ) {
+            cli.freestanding = 1;
             continue;
         }
 

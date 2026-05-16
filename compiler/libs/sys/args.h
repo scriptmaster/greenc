@@ -1,6 +1,5 @@
 #pragma once
 
-#include "libgreenc.h"
 #include "sys_write.h"
 
 typedef struct {

@@ -3,6 +3,7 @@
 #include "../args.h" /// greenc_args and args_result types
 #include "cache_output.h" /// resolve .cache/greenc output path under cwd or HOME
 #include "lang.h" /// parse emit lexer types
+#include "../libs/sys/exec.h" /// greenc_exec_wait for invoking gcc after emit
 
 #define GREENC_PENDING_SOURCES_MAX 64 /// max input files per run stack size for pending_sources in main.c
 
@@ -128,7 +129,24 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
         return 1; /// error
     }
 
-    char* emitted = greenc_emit_program(combined, gcc_arg, cli->output_file); /// format C with header comment
+    char* cwd = greenc_getcwd_alloc(); /// base_path for greenc include resolution
+    char* cwd_norm = cwd ? greenc_normalize_cache_path_alloc(cwd) : NULL;
+    greenc_free(cwd);
+
+    /// build gcc flags: always -std=c17 -s; expand to full freestanding set if requested
+    /// freestanding also passes -DGREENC_MAIN so start.h activates the startup shim,
+    /// and on Windows adds the required linker flags for the custom entry point
+#ifdef _WIN32
+    const char* gcc_flags = cli->freestanding
+        ? "-std=c17 -s -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib -lshell32 -lkernel32 -luser32 -Wl,-egreenc_start"
+        : "-std=c17 -s";
+#else
+    const char* gcc_flags = cli->freestanding
+        ? "-std=c17 -s -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib"
+        : "-std=c17 -s";
+#endif
+
+    char* emitted = greenc_emit_program(combined, gcc_arg, cli->output_file, cwd_norm, gcc_flags, cli->freestanding); /// format C with header comment
 
     if (!emitted) { /// OOM or emit bug
         print("greenc: emit failed"); /// message
@@ -143,9 +161,22 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
         return greenc_emit_abort(combined, pending, pending_n, out_c_path, emitted); /// free emitted and path and pending
     }
 
-    print("wrote:"); /// success label
-    print(out_c_path); /// show final .c path
+    // print("wrote:"); /// success label
+    // print(out_c_path); /// show final .c path
+
+    /// invoke gcc to compile the generated C file into the target binary
+    char* gcc_cmd = greenc_concat("gcc -o ", cli->output_file, " ", gcc_arg, " ", gcc_flags);
+    if (gcc_cmd) {
+        print(gcc_cmd);
+        int gcc_ret = greenc_exec_wait(gcc_cmd);
+        greenc_free(gcc_cmd);
+        if (gcc_ret != 0) {
+            print("greenc: gcc returned non-zero"); /// gcc failed
+        }
+    }
+
     greenc_free(emitted); /// generated text no longer needed
+    greenc_free(cwd_norm); /// base path used for include resolution
     greenc_free(gcc_arg); /// hint string duplicate of rel path case
     greenc_free(out_c_path); /// path string
     greenc_pending_release(pending, pending_n); /// AST done slices invalid safe to release sources
