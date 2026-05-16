@@ -4,7 +4,7 @@
 #include "args.h" /// CLI -o and input file list
 #include "lang/compile_pipeline.h" /// merge inputs emit write and pending source lifetime
 
-#define VERSION "v1.0.5" /// printed banner version string
+#define VERSION "v1.1.0" /// printed banner version string
 
 static int greenc_compile_and_emit(greenc_args* cli);
 
