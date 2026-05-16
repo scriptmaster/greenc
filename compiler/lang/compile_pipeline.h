@@ -133,23 +133,35 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
     char* cwd_norm = cwd ? greenc_normalize_cache_path_alloc(cwd) : NULL;
     greenc_free(cwd);
 
-    /// build gcc flags: always -std=c17 -s; expand to full freestanding set if requested
+    /// opt flag: user-supplied -O flag, or -Os by default
+    const char* opt = cli->opt_flag ? cli->opt_flag : "-Os";
+
+    /// build gcc flags: <opt> -std=c17 -s [+ freestanding set on request]
     /// freestanding also passes -DGREENC_MAIN so start.h activates the startup shim,
     /// and on Windows adds the required linker flags for the custom entry point
 #ifdef _WIN32
-    const char* gcc_flags = cli->freestanding
-        ? "-std=c17 -s -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib -lshell32 -lkernel32 -luser32 -Wl,-egreenc_start"
-        : "-std=c17 -s";
+    const char* base_flags = cli->freestanding
+        ? " -std=c17 -s -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib -lshell32 -lkernel32 -luser32 -Wl,-egreenc_start"
+        : " -std=c17 -s";
 #else
-    const char* gcc_flags = cli->freestanding
-        ? "-std=c17 -s -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib"
-        : "-std=c17 -s";
+    const char* base_flags = cli->freestanding
+        ? " -std=c17 -s -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib"
+        : " -std=c17 -s";
 #endif
+    char* gcc_flags = greenc_concat(opt, base_flags);
+    if (!gcc_flags) {
+        print("greenc: out of memory building flags");
+        greenc_free(gcc_arg);
+        greenc_pending_release(pending, pending_n);
+        greenc_free(combined);
+        return 1;
+    }
 
     char* emitted = greenc_emit_program(combined, gcc_arg, cli->output_file, cwd_norm, gcc_flags, cli->freestanding); /// format C with header comment
 
     if (!emitted) { /// OOM or emit bug
         print("greenc: emit failed"); /// message
+        greenc_free(gcc_flags);
         greenc_free(gcc_arg); /// drop gcc hint string
         return greenc_emit_abort(combined, pending, pending_n, out_c_path, NULL); /// free path not emitted body
     }
@@ -157,15 +169,17 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
     if (greenc_write_file(out_c_path, emitted) != 0) { /// disk write failed
         print("greenc: unable to write output"); /// message
         print(out_c_path); /// show target path
+        greenc_free(gcc_flags);
         greenc_free(gcc_arg); /// drop hint before abort frees rest
         return greenc_emit_abort(combined, pending, pending_n, out_c_path, emitted); /// free emitted and path and pending
     }
 
-    // print("wrote:"); /// success label
-    // print(out_c_path); /// show final .c path
+    print("wrote:"); /// success label
+    print(out_c_path); /// show final .c path
 
     /// invoke gcc to compile the generated C file into the target binary
     char* gcc_cmd = greenc_concat("gcc -o ", cli->output_file, " ", gcc_arg, " ", gcc_flags);
+    greenc_free(gcc_flags);
     if (gcc_cmd) {
         print(gcc_cmd);
         int gcc_ret = greenc_exec_wait(gcc_cmd);

@@ -2,20 +2,13 @@
 
 #include "libgreenc.h"
 
-typedef enum {
-    OPT_UNSPECIFIED = -1,
-    OPT_O0 = 0,
-    OPT_O1 = 1,
-    OPT_O2 = 2,
-    OPT_O3 = 3
-} greenc_opt_level;
-
 typedef struct {
     string_list input_files;
     char* output_file;
-    greenc_opt_level optimize_level;
+    char* opt_flag;   /// -Os (default) / -O0 / -O1 / -O2 / -O3 / -Oz / any -O... passed through to gcc
     int strip;        /// -s: strip symbols (passed to gcc as -s)
     int freestanding; /// -gc / -nolibc / -greenc / -nostdlib / -ffreestanding / -fno-builtin / -static-libgcc
+    int nogc;         /// -nogc / -libc: opt out of freestanding mode (overrides default)
     int error;
 } greenc_args;
 
@@ -29,9 +22,6 @@ static inline greenc_args greenc_args_parse(
 ) {
 
     greenc_args cli = {0};
-
-    cli.optimize_level =
-        OPT_UNSPECIFIED;
 
     // -----------------------------
     // positional -> input files
@@ -61,23 +51,11 @@ static inline greenc_args greenc_args_parse(
         // -------------------------
         // optimization
         // -------------------------
-        if (greenc_streq(opt, "-O0")) {
-            cli.optimize_level = OPT_O0;
-            continue;
-        }
-
-        if (greenc_streq(opt, "-O1")) {
-            cli.optimize_level = OPT_O1;
-            continue;
-        }
-
-        if (greenc_streq(opt, "-O2")) {
-            cli.optimize_level = OPT_O2;
-            continue;
-        }
-
-        if (greenc_streq(opt, "-O3")) {
-            cli.optimize_level = OPT_O3;
+        // -------------------------
+        // optimization: any -O... flag is stored verbatim and passed to gcc
+        // -------------------------
+        if (greenc_string_startswith(opt, "-O")) {
+            cli.opt_flag = opt;
             continue;
         }
 
@@ -86,6 +64,14 @@ static inline greenc_args greenc_args_parse(
         // -------------------------
         if (greenc_streq(opt, "-s")) {
             cli.strip = 1;
+            continue;
+        }
+
+        // -------------------------
+        // opt-out of freestanding/gc mode
+        // -------------------------
+        if (greenc_streq(opt, "-nogc") || greenc_streq(opt, "-libc")) {
+            cli.nogc = 1;
             continue;
         }
 
@@ -123,6 +109,12 @@ static inline greenc_args greenc_args_parse(
     // -----------------------------
     // defaults
     // -----------------------------
+
+    /// gc/freestanding is the default — opt out with -nogc or -libc
+    if (!cli.nogc) {
+        cli.freestanding = 1;
+    }
+
     if (!cli.output_file) {
 
 #ifdef _WIN32
