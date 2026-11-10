@@ -6,9 +6,10 @@ CSTD=-std=c17
 CFLAGS=$(OPT) $(CSTD) -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib
 WINFLAGS=-lshell32 -lkernel32 -luser32 -Wl,-egreenc_start
 INCLUDES=./libs/
+TIME=time
 
 build:
-	timed $(CC) $(CFLAGS) -I$(INCLUDES) main.c -o greenc.exe $(WINFLAGS)
+	$(TIME) $(CC) $(CFLAGS) -I$(INCLUDES) main.c -o greenc.exe $(WINFLAGS)
 	ls -lah greenc.exe
 	ldd greenc.exe
 	cp greenc.exe ../
