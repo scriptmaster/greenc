@@ -1,0 +1,5 @@
+# The public window header also declares GPU and canvas APIs.
+source ui_window_win32.c
+source ui_gpu_win32.c
+source ui_renderer_win32.c
+link -lopengl32 -lgdi32 -luser32

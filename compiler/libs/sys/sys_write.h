@@ -22,12 +22,18 @@ static inline void sys_write(const char* buf, usize len) {
 // ----------------------------
 #else
 
+#ifdef GREENC_HOSTED
+#include <unistd.h>
+#endif
+
 // ----------------------------
 // syscall_write (multi-platform)
 // ----------------------------
 static inline isize syscall_write(int fd, const void* buf, usize len) {
 
-#if defined(__x86_64__)
+#if defined(GREENC_HOSTED)
+    return (isize)write(fd, buf, (size_t)len);
+#elif defined(__x86_64__)
 
     #if defined(__APPLE__)
         #define SYS_WRITE 0x2000004

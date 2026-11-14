@@ -52,6 +52,10 @@ static inline int greenc_listdir(const char* path, greenc_dirent* out, int max) 
     return count;
 }
 
+#elif defined(GREENC_HOSTED)
+
+#include "listdir_posix.h"
+
 #else
 
 // ----------------------------

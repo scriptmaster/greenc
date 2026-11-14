@@ -18,6 +18,23 @@ It compiles to clean C (Emit-C backend) and produces small deterministic binarie
 
 ## GreenC Editor for Windows
 
+Double-click `build.bat` on Windows, or run `./build.sh` on Linux/macOS. The
+scripts produce a Git-ignored compiler at the repository root (`greenc.exe` on
+Windows, `greenc` on Unix). With the MSYS2 UCRT64 native toolchain
+on PATH, build the editor in PowerShell:
+
+```powershell
+.\greenc.exe build examples\win/editor
+.\examples\win\editor\bin\editor.exe
+```
+
+`greenc examples/win/editor` and `greenc examples/win/editor/src/main.c`
+also build the application. GreenC discovers application sources beneath the
+entry point, checks hosted ownership contracts, and generates native compiler
+commands without reading a Makefile. Active includes discover bundled native
+library implementations and link requirements. Both slash styles work. See the
+[compiler build guide](compiler/README.md) for discovery rules and annotations.
+
 Build the editor, restore a workspace, edit text or hex, debug a GreenC program, or install its Explorer folder commands. The editor guide covers keyboard shortcuts, themes, terminal and Files tabs, and Windows 11 setup. [Read the editor guide](examples/win/editor/README.md).
 
 ## Core Philosophy
@@ -304,7 +321,7 @@ Heap escapes
 - [ ] build graph struct
 
 ## CLI
-- [ ] `greenc build .`
+- [x] `greenc build .` (Windows hosted applications)
 - [ ] `-o output`
 - [ ] argument parsing
 

@@ -1,16 +1,12 @@
 .PHONY: all build compiler
 
-OUT = calm3
-COMPILER=greenc
-
 CC = gcc
-CFLAGS = -Os
-SOURCES = src/main.c
+CFLAGS = -Os -std=c17 -DGREENC_MAIN -static-libgcc -ffreestanding -fno-builtin -nostdlib
+compiler_headers = $(wildcard $(1)/*.h) $(foreach directory,$(wildcard $(1)/*/),$(call compiler_headers,$(directory)))
 
-$(OUT): compiler
+all: compiler
+build: compiler
+compiler: greenc.exe
 
-compiler:
-	make -C compiler
-
-build: $(OUT)
-	ls -lah $(OUT)
+greenc.exe: compiler/main.c $(call compiler_headers,compiler)
+	$(CC) $(CFLAGS) -Icompiler/libs compiler/main.c -o $@ -lshell32 -lkernel32 -luser32 -Wl,-egreenc_start

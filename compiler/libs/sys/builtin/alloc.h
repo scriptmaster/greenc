@@ -1,7 +1,9 @@
 #ifndef GREENC_ALLOC_H
 #define GREENC_ALLOC_H
 
-#ifdef _WIN32
+#if defined(GREENC_HOSTED)
+    #include <stdlib.h>
+#elif defined(_WIN32)
     #include <windows.h>
 #else
     /* Linux x86_64 Syscall Definitions */
@@ -18,7 +20,9 @@
 static inline void* greenc_malloc(size_t size) {
     if (size == 0) return NULL;
 
-#ifdef _WIN32
+#if defined(GREENC_HOSTED)
+    return malloc(size);
+#elif defined(_WIN32)
     /* Windows Heap Allocation */
     return HeapAlloc(GetProcessHeap(), 0, size);
 #else
@@ -53,7 +57,9 @@ static inline void* greenc_malloc(size_t size) {
 static inline void greenc_free(void* ptr) {
     if (!ptr) return;
 
-#ifdef _WIN32
+#if defined(GREENC_HOSTED)
+    free(ptr);
+#elif defined(_WIN32)
     HeapFree(GetProcessHeap(), 0, ptr);
 #else
     greenc_mem_header_t* h = (greenc_mem_header_t*)ptr - 1;
@@ -68,20 +74,10 @@ static inline void greenc_free(void* ptr) {
 }
 
 static inline void greenc_mfree(void** ptr) {
-    if (!ptr || !*ptr) return;
+    if (!ptr || !*ptr) { return; }
 
-#ifdef _WIN32
-    HeapFree(GetProcessHeap(), 0, *ptr);
-#else
-    greenc_mem_header_t* h = (greenc_mem_header_t*)*ptr - 1;
-    __asm__ volatile (
-        "syscall"
-        :
-        : "a" ((long)GREENC_SYS_MUNMAP), "D" (h), "S" (h->size)
-        : "rcx", "r11", "memory"
-    );
-#endif
-    *ptr = NULL; // ✅
+    greenc_free(*ptr);
+    *ptr = NULL;
 }
 
 #endif

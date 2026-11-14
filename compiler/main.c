@@ -5,6 +5,7 @@
 #include "lang/compile_pipeline.h" /// merge inputs emit write and pending source lifetime
 
 #include "lang/hosted_module.h"
+#include "project_build.h"
 
 #define VERSION "v1.1.0" /// printed banner version string
 
@@ -14,6 +15,28 @@ int greenc_main(int argc, char** argv, char** envp) {
     (void)envp; /// not used in this build
 
     print("greenc (" VERSION ")\n"); /// startup banner
+
+#ifdef _WIN32
+    if (argc > 1 && greenc_streq(argv[1], "build")) {
+        if (argc != 3) {
+            print("greenc: usage: greenc build <directory-or-main.c>\n");
+
+            return 1;
+        }
+
+        return greenc_build_project(argv[2]);
+    }
+
+    if (argc == 2) {
+        DWORD attributes = GetFileAttributesA(argv[1]);
+
+        if ((attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) ||
+            greenc_streq(argv[1], "main.c") || greenc_string_endswith(argv[1], "/main.c") ||
+            greenc_string_endswith(argv[1], "\\main.c")) {
+            return greenc_build_project(argv[1]);
+        }
+    }
+#endif
 
     args_result args = args_parse(argc, argv); /// split argv into flags and positionals
     greenc_args cli = greenc_args_parse(args); /// map to greenc -o and file list

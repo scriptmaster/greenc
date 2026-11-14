@@ -9,6 +9,14 @@ static inline usize sys_getcwd(char* buf, usize size) {
     return GetCurrentDirectoryA((DWORD)size, buf);
 }
 
+#elif defined(GREENC_HOSTED)
+
+#include <unistd.h>
+
+static inline isize sys_getcwd(char* buffer, usize capacity) {
+    return getcwd(buffer, (size_t)capacity) ? (isize)greenc_strlen(buffer) : -1;
+}
+
 #else
 
 #if defined(__x86_64__)

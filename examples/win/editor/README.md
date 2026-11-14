@@ -1,8 +1,29 @@
 # GreenC Editor for Windows
 
-From this directory, run `make` with the MinGW GCC toolchain and launch `editor.exe [file]`. Run `make test` for the editor checks. The entry point is in `src/main.c`. Application contracts are in `src/app/*.h` and the implementation directories group startup, entities, views, input, workflows and utilities.
+From the repository root in PowerShell, build and run with:
 
-The build bootstraps GreenC and emits each application source under `build/`. Hosted modules parse statement and scope structure and lower typed local declarations such as `let u32 next`. MinGW checks C types and expressions and links the generated application with the Windows backends. The editor tests and scroll benchmark use the same generated application sources.
+```powershell
+.\greenc.exe build examples\win/editor
+.\examples\win\editor\bin\editor.exe [file]
+```
+
+These build forms are equivalent:
+
+```powershell
+.\greenc.exe examples/win/editor
+.\greenc.exe examples\win\editor\src\main.c
+.\greenc.exe build examples/win/editor/src/main.c
+```
+
+Forward and backward path separators are normalized. Use `greenc` when it is on PATH; PowerShell requires `.\greenc.exe` for the compiler in the current directory. From this directory use `..\..\..\greenc.exe .` or `..\..\..\greenc.exe src/main.c`.
+
+The root `greenc.exe` is a locally built, Git-ignored compiler. If absent, double-click `build.bat` at the repository root, or run `.\build.bat --no-pause`. Install the MSYS2 UCRT64 native toolchain (GCC/G++ and windres) and add its bin directory to PATH. The editor build itself does not use Make or a Makefile.
+
+GreenC finds `main.c` or `src/main.c` in a directory input. For a `main.c` file input it starts from that file's directory. It recursively collects application `.c` and `.gc` files, adds header search directories, checks the single `.ownership` contract file, emits hosted C under `build/greenc/`, and generates a GCC response file for linking. It skips hidden directories, reparse points, and directories named `bin`, `build`, `test` or `tests`. Source discovery collects the source tree; it does not infer implementations from function calls or select among multiple application entry points. Use a separate source tree for each application.
+
+GreenC follows active includes reported by the native preprocessor to discover bundled library implementations and their linker dependencies. Library headers select sibling sources or library-owned `.sources` manifests; `main.c` does not list UI or filesystem backends. Entry-point `// greenc:` annotations retain the Windows application subsystem, the icon resource and Explorer companion preparation. GreenC generates the editor compile/link command. The resulting executable is `bin/editor.exe`; its companion DLL and MSIX package are built beside it. Building does not install the Explorer extension. Treat build annotations as executable project code and build trusted sources only.
+
+The application entry point is `src/main.c`. Headers are in `src/app/`, and implementation directories group startup, entities, views, input, workflows and utilities. The existing Makefile remains a legacy developer test harness; its test, debugger and benchmark targets are not supported by the GreenC project-build CLI.
 
 The default window is maximized with antialiased Consolas text. Use `--windowed`, `--fullscreen` or `--borderless` to choose another mode, and `--fps=N` to set startup pacing. The editor starts with CPU rendering at 30 FPS. One click on the FPS control selects 60 FPS. Use `--gpu` to request accelerated presentation with CPU fallback.
 
@@ -16,7 +37,7 @@ Ctrl+T and Ctrl+W add and close tabs in the focused panel. Files opens a folder 
 
 Click the disclosure beside a line number to fold a block. Click the hidden-line count to expand it. The far-left gutter toggles a breakpoint. The first breakpoint opens Debugger settings if no executable has been chosen. Settings opens as an editor tab and can be closed with its close icon or Ctrl+W. Theme edits apply immediately and persist in local application data. Scroll the theme field list with the wheel. Breakpoint and stopped-line backgrounds are independently themeable.
 
-Choose a GDB executable in Editor / Debugger. Build the target with debug symbols (for hosted GreenC use the emitted C with GCC `-g -O0`). F5 asks for the target executable, installs the marked lines from open saved source files, and runs it. At a stop, F5 continues, F10 steps over, F11 steps into and Shift+F5 stops the session. Rebuild after editing source and restart to load changed breakpoints. Run `make debug-test` for a live GDB regression using `test/debug_target.gc`.
+Choose a GDB executable in Editor / Debugger. Choose a target executable built with debug symbols. F5 asks for the target executable, installs the marked lines from open saved source files, and runs it. At a stop, F5 continues, F10 steps over, F11 steps into and Shift+F5 stops the session. Rebuild after editing source and restart to load changed breakpoints. The legacy developer harness includes a live GDB regression using `test/debug_target.gc`.
 
 Right-click a tab for New, Close, Save or Save All. Document tabs save their buffers. Terminal tabs export their visible screens to text. Files tabs export their root paths. A leading dot indicates unsaved document edits or activity in an unfocused shell or folder. Folder notifications and console screen changes are checked every three seconds.
 
@@ -42,7 +63,7 @@ The editor currently accepts ASCII text documents that fit in available process 
 
 The editor reads 64 KiB blocks into a growing flat text buffer. A flat index records visible line boundaries. Scrolling paints the viewport, and caret jumps use binary search on that index. The working set includes text, index entries and allocation headroom. Fold flags are allocated on first use. Opening, saving, editing a flat buffer and rebuilding its index can still take time proportional to file size.
 
-To measure your machine, build `make bin/scroll_benchmark.exe` and run `bin/scroll_benchmark.exe path/to/file.txt` with a supported document containing more than 1,000 lines. The CPU benchmark reports file loading, first index and frame, 200 wheel-and-paint frames, and 10,000 cursor lookups without frame-rate pacing.
+The legacy developer harness can build `bin/scroll_benchmark.exe`. Run that executable with `path/to/file.txt`, using a supported document containing more than 1,000 lines. The CPU benchmark reports file loading, first index and frame, 200 wheel-and-paint frames, and 10,000 cursor lookups without frame-rate pacing.
 
 ## File details and hex editing
 
@@ -81,6 +102,6 @@ The editor's regular startup, opening General, building the package, and receivi
 
 ## Build and architecture
 
-The Makefile bootstraps GreenC, checks the hosted ownership contracts and emits intermediate C in build/. The native compiler links the editor and Windows backends into bin/editor.exe. The launcher in this directory points to that executable. The Windows build also creates the shell-extension DLL, embedded icon and sparse MSIX identity package. Building does not install them. Run make test for editor and compiler regressions and make debug-test for the GDB integration test.
+GreenC discovers application sources beneath src/, checks hosted ownership contracts and emits intermediate C and the native link response file under build/greenc/. Active includes select library-owned implementations and link requirements. Entry-point annotations declare application resources and companion preparation; no Makefile is read. The native toolchain links the application into bin/editor.exe and builds the shell-extension DLL, icon and sparse MSIX identity package.
 
 The compiler enforces declared move, read and stack ownership contracts, including supported struct fields, function arguments and returns. The runtime memory counter describes this process on this machine; switching compilers alone does not guarantee a particular working set. Shared UI and filesystem libraries own platform mechanisms. The editor owns window preferences, shortcuts, document behavior, theme and layout. See the repository's PRINCIPLES.md and AGENTS.md for the boundary and source conventions.

@@ -56,6 +56,10 @@ static inline int greenc_mkdir_one(const char* path) {
     return -1;
 }
 
+#elif defined(GREENC_HOSTED)
+
+#include "file_posix.h"
+
 #else
 
 // ----------------------------

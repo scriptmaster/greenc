@@ -54,7 +54,11 @@ static inline char* greenc_getcwd_alloc() {
     if (!buf) return NULL;
 
     isize n = sys_getcwd(buf, size);
-    if (n <= 0) return NULL;
+    if (n <= 0) {
+        greenc_free(buf);
+
+        return NULL;
+    }
 
     return buf;
 }

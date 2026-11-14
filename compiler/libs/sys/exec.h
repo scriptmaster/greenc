@@ -51,6 +51,10 @@ static int greenc_exec_wait(const char* cmd) {
     return (int)code;
 }
 
+#elif defined(GREENC_HOSTED)
+
+#include "exec_posix.h"
+
 #else
 
 /// Linux stub — freestanding fork+execve via syscalls not yet implemented

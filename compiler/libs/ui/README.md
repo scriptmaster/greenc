@@ -4,6 +4,12 @@ This is the reusable UI architecture. Programs live in examples/win/. Read the
 root and local AGENTS.md before changing this directory. Ordinary program
 customization uses the API; architecture changes require an explicit request.
 
+GreenC project builds follow active includes and use `ui_window.sources` and
+`ui_dialog.sources` beside the public headers to select native implementation
+files and system link libraries. This metadata belongs to the library; programs
+keep resources, subsystem choice and packaging in their own build annotations.
+The metadata does not change the UI API or add a non-Windows backend.
+
 ## Responsibilities
 
 | Library mechanism | Application choice |

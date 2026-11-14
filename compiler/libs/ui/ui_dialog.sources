@@ -1,0 +1,2 @@
+source ui_dialog_win32.c
+link -lcomdlg32 -lshell32 -lole32

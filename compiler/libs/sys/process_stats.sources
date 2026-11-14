@@ -1,0 +1,2 @@
+source process_stats_win32.c
+link -lpsapi
