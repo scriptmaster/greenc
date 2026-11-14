@@ -1,0 +1,5 @@
+void check(int flag) {
+    char* a = alloc(); ///move
+    free(a);
+    free(a);
+}

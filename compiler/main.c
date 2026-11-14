@@ -4,6 +4,8 @@
 #include "args.h" /// CLI -o and input file list
 #include "lang/compile_pipeline.h" /// merge inputs emit write and pending source lifetime
 
+#include "lang/hosted_module.h"
+
 #define VERSION "v1.1.0" /// printed banner version string
 
 static int greenc_compile_and_emit(greenc_args* cli);
@@ -23,6 +25,13 @@ int greenc_main(int argc, char** argv, char** envp) {
     if (cli.input_files.count == 0) { /// need at least one .c or .gc input
         print("greenc: error: no input files"); /// tell user
         return 1; /// exit non-zero
+    }
+
+    if (cli.hosted_module) { return greenc_emit_hosted_module(&cli); }
+
+    if (cli.emit_c_only && !cli.output_file) {
+        print("greenc: --emit-c requires -o output.c");
+        return 1;
     }
 
     return greenc_compile_and_emit(&cli); /// full parse merge emit write path

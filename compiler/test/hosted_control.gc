@@ -1,0 +1,29 @@
+#include <stdlib.h>
+
+static int checked_transfer(void) {
+    int* first = malloc(sizeof(*first)); ///move
+    if (!first) { return 1; }
+    *first = 7;
+    int* second = first; ///move
+    const int* borrowed = second; ///read
+    int value = *borrowed; ///stack
+    free(second);
+
+    return value == 7 ? 0 : 1;
+}
+
+int main(void) {
+    if (checked_transfer()) { return 1; }
+    let int total = 0;
+    for (int i = 0; i < 5; ++i) {
+        if (i == 3) { continue; }
+        total += i;
+    }
+
+    while (total < 10) { ++total; }
+    do { --total; } while (total > 9);
+    switch (total) {
+        case 9: return 0;
+        default: return 1;
+    }
+}

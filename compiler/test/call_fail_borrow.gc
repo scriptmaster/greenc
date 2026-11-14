@@ -1,0 +1,3 @@
+void inspect(char* a) {
+    free(a);
+}

@@ -1,0 +1,3 @@
+char* invalid_result(char* a) {
+    return a;
+}

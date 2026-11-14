@@ -1,10 +1,16 @@
-#include "../ui_window.h"
+#include "../../../compiler/libs/ui/ui_window.h"
 
 int main(void) {
     /* Program setting: change to 128, 144, or another desired frame rate. */
     const u32 target_fps = 240;
 
-    ui_window* window = ui_window_create_fullscreen("GreenC CPU interface - Escape to exit", target_fps);
+    const ui_window_config config = {
+        .title = "GreenC CPU interface - Escape to exit",
+        .target_fps = target_fps,
+        .mode = UI_WINDOW_FULLSCREEN,
+        .close_button = true
+    };
+    ui_window* window = ui_window_create(&config);
     if (!window) {
         return ui_report_error("Cannot create the CPU window.");
     }
@@ -20,6 +26,13 @@ int main(void) {
     i32 result = 0;
 
     while (ui_window_poll_events()) {
+        ui_input input;
+        while (ui_window_next_input(window, &input)) {
+            if (input.close_requested || input.key == UI_KEY_ESCAPE) {
+                ui_window_request_close(window);
+            }
+        }
+
         if (!ui_window_is_visible(window)) {
             ui_sleep_ms(50);
 

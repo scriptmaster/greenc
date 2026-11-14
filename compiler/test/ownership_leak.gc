@@ -1,0 +1,4 @@
+void check(int flag) {
+    char* a = alloc(); ///move
+    inspect(a);
+}

@@ -1,0 +1,3 @@
+void test(void) {
+    char* a = acquire(); ///read
+}

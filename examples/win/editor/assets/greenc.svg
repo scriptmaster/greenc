@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>GreenC Editor</title>
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#17252a"/>
+  <path d="M 23.42462 23.42462 A 10.5 10.5 0 1 1 23.42462 8.57538 L 20.24264 11.75736 A 6 6 0 1 0 20.24264 20.24264 Z" fill="#77e4af"/>
+</svg>

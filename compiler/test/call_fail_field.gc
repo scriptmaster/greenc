@@ -1,0 +1,4 @@
+void test_fields(Box* box) {
+    dispose(box->data);
+    inspect(box->data);
+}

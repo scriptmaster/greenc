@@ -16,6 +16,10 @@ It compiles to clean C (Emit-C backend) and produces small deterministic binarie
 
 ---
 
+## GreenC Editor for Windows
+
+Build the editor, restore a workspace, edit text or hex, debug a GreenC program, or install its Explorer folder commands. The editor guide covers keyboard shortcuts, themes, terminal and Files tabs, and Windows 11 setup. [Read the editor guide](examples/win/editor/README.md).
+
 ## Core Philosophy
 
 C, explicit ownership, contracts, compile-time safety
@@ -77,6 +81,26 @@ greenc_free(heap);
 ```
 
 ---
+
+## Checked local ownership
+
+Put the marker after an initialized local declaration on the same line. A direct
+`///move` from a named owner transfers it. A `///read` alias can access its
+source while that source remains live. A `///stack` value cannot be consumed
+by a release operation. Freeing, closing or destroying a tracked owner consumes
+it. Returning an owner or storing it directly in a struct field transfers it.
+The checker diagnoses outstanding owners at scope exits and merges conditional
+branches. The editor uses the hosted-module build for these declarations.
+
+Checks cover annotated local names and recognized release functions. Hosted modules may share a contract file using `--contracts path`. For example,
+`fn dispose(move) plain;` consumes its first argument and `fn acquire() move;`
+requires callers to take ownership of its result. Parameter positions use
+`plain`, `read`, `stack` or `move`. A declaration such as `field Box.data move;`
+describes a direct member. A `fields(Box)` parameter tracks those members in
+the definition. A `drain(Box)` parameter also requires releasing or transferring
+owned members on exit and consumes them at checked call sites. Indirect calls,
+uncontracted native code, nested aggregate aliases and pointer arithmetic
+remain outside this analysis.
 
 ## Chaining Rules
 
@@ -315,7 +339,7 @@ Heap escapes
 - [ ] struct/type contracts
 
 ## Borrow Checker (core differentiator)
-- [ ] ownership rules (`///move`, `///read`, `///stack`)
+- [x] Local ownership contracts in hosted modules (see below).
 - [ ] pointer tracking (no ref counting)
 - [ ] free enforcement (same scope / last use)
 - [ ] escape rules

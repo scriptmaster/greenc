@@ -10,19 +10,39 @@ static inline char* greenc_read_file(const char* path) {
     greenc_fd fd = sys_open_read(path);
     if ((isize)fd < 0) return NULL;
 
-    usize cap = 4096;
-    char* buf = (char*)greenc_malloc(cap + 1);
-    if (!buf) return NULL;
+    size_t used = 0, capacity = 4096;
+    char* buffer = greenc_malloc(capacity + 1);
+    while (buffer) {
+        if (used == capacity) {
+            char* larger = capacity < ((size_t)-1) / 2 ? greenc_malloc(capacity * 2 + 1) : NULL;
+            if (larger) {
+                greenc_memcpy(larger, buffer, used);
+                capacity *= 2;
+            }
 
-    isize n = sys_read(fd, buf, cap);
-    if (n <= 0) {
-        sys_close(fd);
-        return NULL;
+            greenc_free(buffer);
+            buffer = larger;
+            if (!buffer) { break; }
+        }
+
+        size_t room = capacity - used;
+        isize count = sys_read(fd, buffer + used, room < 65536 ? room : 65536);
+        if (count < 0) {
+            greenc_free(buffer);
+            buffer = NULL;
+            break;
+        }
+
+        if (!count) {
+            buffer[used] = '\0';
+            break;
+        }
+
+        used += (size_t)count;
     }
 
-    buf[n] = '\0';
     sys_close(fd);
-    return buf;
+    return buffer;
 }
 
 // ----------------------------

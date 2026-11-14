@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #pragma once /// single include for driver compile steps
 
 #include "../args.h" /// greenc_args and args_result types
@@ -48,6 +49,8 @@ static int greenc_emit_abort( /// fatal path after emit started frees emit buffe
     return 1; /// error exit
 }
 
+static bool greenc_check_annotated_source(char* source, const char* path);
+
 static int greenc_merge_append_file( /// read one path parse one TU merge into combined
     char* path, /// argv path string owned by args not freed here
     char* source, /// full file text malloced by greenc_read_file
@@ -64,6 +67,10 @@ static int greenc_merge_append_file( /// read one path parse one TU merge into c
 
     pending[*pending_n] = source; /// record buffer so main can defer free until emit
     (*pending_n)++; /// bump retained count
+
+    if (!greenc_check_annotated_source(source, path)) {
+        return greenc_merge_abort(combined, pending, *pending_n, NULL);
+    }
 
     greenc_program* one = greenc_parse_file(source, kw); /// build AST with slices into source
 
@@ -168,7 +175,13 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
     int pending_n /// number of retained buffers
 ) {
     char* gcc_arg = NULL; /// second arg to greenc_emit_program gcc hint string
-    char* out_c_path = greenc_resolve_emit_c_output_paths(cli->output_file, &gcc_arg); /// .cache/greenc key layout
+    char* out_c_path;
+    if (cli->emit_c_only) {
+        out_c_path = greenc_concat(cli->output_file, "");
+        gcc_arg = greenc_concat(cli->output_file, "");
+    } else {
+        out_c_path = greenc_resolve_emit_c_output_paths(cli->output_file, &gcc_arg);
+    } /// .cache/greenc key layout
 
     if (!out_c_path || !gcc_arg) { /// mkdir or concat failure
         print("greenc: unable to create output path (.cache or HOME/.cache)"); /// explain failure
@@ -229,7 +242,7 @@ static int greenc_emit_write_output( /// resolve output path emit C write disk f
     greenc_ensure_output_dir(cli->output_file); /// create -o target directory if needed
 
     /// invoke gcc to compile the generated C file into the target binary
-    char* gcc_cmd = greenc_concat("gcc -o ", cli->output_file, " ", gcc_arg, " ", gcc_flags);
+    char* gcc_cmd = cli->emit_c_only ? NULL : greenc_concat("gcc -o ", cli->output_file, " ", gcc_arg, " ", gcc_flags);
     greenc_free(gcc_flags);
     if (gcc_cmd) {
         print(gcc_cmd);

@@ -1,0 +1,3 @@
+void release_fields(Box* box) {
+    inspect(box->data);
+}

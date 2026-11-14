@@ -1,0 +1,4 @@
+void check(int flag) {
+    int a = 1; ///stack
+    free(a);
+}

@@ -1,0 +1,7 @@
+field Box.data move;
+fn dispose(move) plain;
+fn acquire() move;
+fn inspect(read) plain;
+fn test_fields(fields(Box)) plain;
+fn invalid_result(read) move;
+fn release_fields(drain(Box)) plain;

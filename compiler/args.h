@@ -9,6 +9,9 @@ typedef struct {
     int strip;        /// -s: strip symbols (passed to gcc as -s)
     int freestanding; /// -gc / -nolibc / -greenc / -nostdlib / -ffreestanding / -fno-builtin / -static-libgcc
     int nogc;         /// -nogc / -libc: opt out of freestanding mode (overrides default)
+    char* contracts_file;
+    int hosted_module;
+    int emit_c_only;  /// Write hosted C to the requested output for a separate native link.
     int error;
 } greenc_args;
 
@@ -36,6 +39,22 @@ static inline greenc_args greenc_args_parse(
 
     	char* opt = args.options.items[i];
         char* val = args.option_values.items[i];
+
+        if (greenc_streq(opt, "--contracts")) {
+            if (!val || cli.contracts_file) { cli.error = 1; return cli; }
+            cli.contracts_file = val;
+            continue;
+        }
+
+        if (greenc_streq(opt, "--hosted-module")) {
+            cli.hosted_module = 1;
+            continue;
+        }
+
+        if (greenc_streq(opt, "--emit-c")) {
+            cli.emit_c_only = 1;
+            continue;
+        }
 
         if (greenc_streq(opt, "-o")) {
             if (!val) {

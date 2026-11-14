@@ -47,10 +47,12 @@ Treat code as two areas with distinct responsibilities:
 - **Architect-maintained library:** public contracts, reusable mechanisms,
   sensible fallback defaults, resource management, and platform encapsulation.
   Keep these generic and independent of an individual program's preferences.
-  Here that means `ui_window.h`, the private backend header, and `*_win32.c`.
+  Here that means `compiler/libs/ui/` and generic platform mechanisms in
+  `compiler/libs/sys/fs/`. The stable-boundary rules in `AGENTS.md` apply.
 - **Developer/user-maintained program:** application settings, content, and
-  behavior. Here that means each example's `main.c`. Put its desired frame rate,
-  title, framebuffer size, and animation choices here and pass settings through
+  behavior. Here that means each example directory, including its settings, model, input
+  and view modules. Put its desired frame rate, title, window mode/decorations,
+  renderer preference, framebuffer size and animation choices here, passing values through
   the public API. One program's choices must not alter another program.
 
 Geometry and colors are application content as well. A renderer accepts
@@ -58,10 +60,20 @@ vertices and colors and preserves coordinate proportions; the program chooses
 whether a triangle is equilateral, its size, and where it rotates. Test those
 mathematical properties, not just whether the graphics API accepts the calls.
 
-For example, a program declares `const u32 target_fps = 144;` and passes it to
-`ui_window_create_fullscreen(title, target_fps)`. Passing zero explicitly opts
-into the library's `UI_DEFAULT_TARGET_FPS` fallback. Editing the library's
-default is an architectural change, not the normal customization workflow.
+For example, a program sets `ui_window_config.target_fps = 144` and passes
+the configuration to `ui_window_create`. It can later call
+`ui_window_set_target_fps(window, 60)` without recreating the window.
+Zero means unpaced. There is no library-selected preferred FPS. Reset pacing
+deadlines when the setting changes; keep animation time independent of FPS.
+
+The same configuration supplies windowed/maximized/borderless-fullscreen mode,
+initial client dimensions, title bar, resize capability and caption buttons.
+Editors choose maximized decorated windows; games may choose fullscreen.
+Neither is a library default. Renderer preference is also program input;
+`UI_RENDERER_AUTO` is the common GPU-to-CPU recovery mechanism. The program
+must not replicate platform probes or fallback branches. The common canvas
+rasterizes on the CPU and can use hardware OpenGL for presentation; this does
+not claim GPU text/layout rasterization.
 
 Expose needed configuration through parameters or configuration structures.
 Keep platform validation and implementation inside the library. Avoid hiding

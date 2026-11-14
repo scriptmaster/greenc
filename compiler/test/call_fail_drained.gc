@@ -1,0 +1,4 @@
+void test_fields(Box* box) {
+    release_fields(box);
+    free(box->data);
+}

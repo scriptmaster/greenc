@@ -1,0 +1,22 @@
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+ xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+ xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+ xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+ xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+ xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+ IgnorableNamespaces="uap uap10 desktop4 desktop5 com rescap">
+ <Identity Name="GreenC.Editor.Explorer" Publisher="CN=GreenC Editor, OID.2.25.311729368913984317654407730594956997722=1" Version="1.0.0.0" ProcessorArchitecture="x64"/>
+ <Properties><DisplayName>GreenC Editor</DisplayName><PublisherDisplayName>GreenC</PublisherDisplayName><Logo>logo.png</Logo><uap10:AllowExternalContent>true</uap10:AllowExternalContent></Properties>
+ <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
+ <Resources><Resource Language="en-us"/></Resources>
+ <Applications><Application Id="Editor" Executable="editor.exe" uap10:RuntimeBehavior="win32App" uap10:TrustLevel="mediumIL">
+ <uap:VisualElements AppListEntry="none" DisplayName="GreenC Editor" Description="GreenC Editor" BackgroundColor="transparent" Square150x150Logo="logo.png" Square44x44Logo="logo.png"/>
+ <Extensions>
+ <com:Extension Category="windows.comServer"><com:ComServer><com:SurrogateServer DisplayName="GreenC Editor"><com:Class Id="8EA263CC-F47A-40A0-8EDB-248A64DDA231" Path="GreenCExplorer.dll" ThreadingModel="STA"/></com:SurrogateServer></com:ComServer></com:Extension>
+ <desktop4:Extension Category="windows.fileExplorerContextMenus"><desktop4:FileExplorerContextMenus>
+ <desktop5:ItemType Type="Directory"><desktop5:Verb Id="GreenCFolder" Clsid="8EA263CC-F47A-40A0-8EDB-248A64DDA231"/></desktop5:ItemType>
+ <desktop5:ItemType Type="Directory\Background"><desktop5:Verb Id="GreenCBackground" Clsid="8EA263CC-F47A-40A0-8EDB-248A64DDA231"/></desktop5:ItemType>
+ </desktop4:FileExplorerContextMenus></desktop4:Extension>
+ </Extensions></Application></Applications><Capabilities><rescap:Capability Name="runFullTrust"/></Capabilities>
+</Package>

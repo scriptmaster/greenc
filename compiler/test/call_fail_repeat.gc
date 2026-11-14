@@ -1,0 +1,5 @@
+void test(void) {
+    char* a = acquire(); ///move
+    dispose(a);
+    dispose(a);
+}

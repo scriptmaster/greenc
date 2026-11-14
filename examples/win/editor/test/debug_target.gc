@@ -1,0 +1,10 @@
+static int increment(int value) {
+    return value + 1;
+}
+
+int main(void) {
+    let int value = 1;
+    value = increment(value);
+    value += 3;
+    return value == 5 ? 0 : 1;
+}

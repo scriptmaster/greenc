@@ -4,6 +4,8 @@
 struct ui_gpu {
     ui_window* window; /* Borrowed; must outlive the context. */
     HGLRC context;
+    GLuint texture;
+    size_t texture_width, texture_height;
 };
 
 ui_gpu* ui_gpu_create(ui_window* window) {
@@ -27,7 +29,7 @@ ui_gpu* ui_gpu_create(ui_window* window) {
         goto failure;
     }
 
-    /* Reject the generic software renderer for this GPU example. */
+    /* This context is hardware-only; the common renderer owns CPU fallback. */
     if ((actual.dwFlags & PFD_GENERIC_FORMAT) ||
         (actual.dwFlags & requested.dwFlags) != requested.dwFlags) {
         goto failure;
@@ -57,6 +59,10 @@ void ui_gpu_destroy(ui_gpu* gpu) {
 
     if (gpu->context) {
         if (wglGetCurrentContext() == gpu->context) {
+            if (gpu->texture) {
+                glDeleteTextures(1, &gpu->texture);
+            }
+
             wglMakeCurrent(NULL, NULL);
         }
 
@@ -64,6 +70,73 @@ void ui_gpu_destroy(ui_gpu* gpu) {
     }
 
     HeapFree(GetProcessHeap(), 0, gpu);
+}
+
+bool ui_gpu_present_framebuffer(ui_gpu* gpu, const ui_framebuffer* framebuffer) {
+    if (!wglMakeCurrent(gpu->window->dc, gpu->context)) {
+        return false;
+    }
+
+    GLint maximum;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum);
+    size_t width = 1, height = 1;
+    while (width < framebuffer->width) {
+        width *= 2;
+    }
+
+    while (height < framebuffer->height) {
+        height *= 2;
+    }
+
+    if (width > (size_t)maximum || height > (size_t)maximum) {
+        return false;
+    }
+
+    if (!gpu->texture) {
+        glGenTextures(1, &gpu->texture);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, gpu->texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    /* BGRA matches the shared top-down BGRX canvas. Unsupported uploads fail
+     * cleanly into the CPU presenter; no driver-specific application code. */
+    if (gpu->texture_width != width || gpu->texture_height != height) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (GLsizei)width, (GLsizei)height,
+                     0, 0x80E1 /* GL_BGRA */, GL_UNSIGNED_BYTE, NULL);
+        gpu->texture_width = width;
+        gpu->texture_height = height;
+    }
+
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)framebuffer->width,
+                   (GLsizei)framebuffer->height, 0x80E1, GL_UNSIGNED_BYTE,
+                   framebuffer->pixels);
+    glViewport(0, 0, (GLsizei)framebuffer->width, (GLsizei)framebuffer->height);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, 1, 1, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1);
+    f32 right = (f32)framebuffer->width / (f32)width;
+    f32 bottom = (f32)framebuffer->height / (f32)height;
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, 0);
+    glVertex2f(0, 0);
+    glTexCoord2f(right, 0);
+    glVertex2f(1, 0);
+    glTexCoord2f(right, bottom);
+    glVertex2f(1, 1);
+    glTexCoord2f(0, bottom);
+    glVertex2f(0, 1);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+    if (glGetError() != GL_NO_ERROR) {
+        return false;
+    }
+
+    return SwapBuffers(gpu->window->dc) != 0;
 }
 
 bool ui_gpu_draw_triangle(ui_gpu* gpu, const ui_vertex2 vertices[3],

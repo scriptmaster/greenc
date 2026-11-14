@@ -1,0 +1,7 @@
+field editor_document.text move;
+field editor_document.folded move;
+fn editor_document_release(fields(editor_document)) plain;
+fn ui_window_create(read) move;
+fn ui_renderer_create(read, read) move;
+fn ui_window_destroy(move) plain;
+fn ui_renderer_destroy(move) plain;
