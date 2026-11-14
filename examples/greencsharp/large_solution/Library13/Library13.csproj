@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Library12/Library12.csproj" />
+    <ProjectReference Include="../Library01/Library01.csproj" />
+  </ItemGroup>
+</Project>

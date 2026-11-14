@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Library18/Library18.csproj" />
+    <ProjectReference Include="../Library01/Library01.csproj" />
+  </ItemGroup>
+</Project>

@@ -6,6 +6,7 @@
 
 #include "lang/hosted_module.h"
 #include "project_build.h"
+#include "csharp_delegate.h"
 
 #define VERSION "v1.1.0" /// printed banner version string
 
@@ -15,6 +16,10 @@ int greenc_main(int argc, char** argv, char** envp) {
     (void)envp; /// not used in this build
 
     print("greenc (" VERSION ")\n"); /// startup banner
+
+    int delegated_status = greenc_csharp_dispatch(argc, argv);
+
+    if (delegated_status != GREENC_CSHARP_UNHANDLED) { return delegated_status; }
 
 #ifdef _WIN32
     if (argc > 1 && greenc_streq(argv[1], "build")) {

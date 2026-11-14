@@ -37,6 +37,25 @@ library implementations and link requirements. Both slash styles work. See the
 
 Build the editor, restore a workspace, edit text or hex, debug a GreenC program, or install its Explorer folder commands. The editor guide covers keyboard shortcuts, themes, terminal and Files tabs, and Windows 11 setup. [Read the editor guide](examples/win/editor/README.md).
 
+## Native C# compilation
+
+The root bootstrap scripts also build the optional native `greencsharp` plugin.
+It parses `.cs`, `.csproj` and `.sln` inputs in C, builds a typed AST and project
+dependency graph, and lowers the supported C# subset directly to native C/header
+units, per-project static `.a` libraries and native executables. It uses neither .NET nor Roslyn.
+
+```powershell
+.\greenc.exe examples/greencsharp/hello/Hello.cs
+.\greenc.exe build examples/greencsharp/projects/App/App.csproj
+.\greenc.exe examples/greencsharp/projects/NativeDemo.sln
+```
+
+See [examples](examples/greencsharp/README.md) and the
+[language, project and plugin contracts](compiler/libs/greencsharp/README.md).
+Unsupported language/project features produce diagnostics. A missing or
+incompatible plugin produces a dependency error without affecting ordinary
+C/GreenC builds.
+
 ## Core Philosophy
 
 C, explicit ownership, contracts, compile-time safety

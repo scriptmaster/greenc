@@ -5,6 +5,12 @@ MSYS2 UCRT64 installation and builds `greenc.exe` beside the script. For command
 line use without the final pause, run `build.bat --no-pause`. `CC` may name a
 different GCC executable. The compiler is ignored; the bootstrap script is tracked.
 
+The bootstrap also builds and checks the optional native `greencsharp` language
+plugin under `compiler/libs/greencsharp/bin/`. It uses C17 and the native toolchain,
+without .NET or Roslyn. C# input is dynamically delegated to this plugin; ordinary
+C/GreenC input does not load it. See the [plugin contract and supported language](libs/greencsharp/README.md)
+and [runnable examples](../examples/greencsharp/README.md).
+
 On Linux or macOS run root `./build.sh`. It selects the current OS, uses
 `${CC:-cc}`, and produces root `greenc`. Unix file-manager double-click behavior
 depends on its executable-script settings; the script has its executable bit

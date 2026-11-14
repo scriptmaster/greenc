@@ -9,3 +9,6 @@ a.exe
 *.bat
 !/build.bat
 /greenc
+/compiler/libs/greencsharp/bin/
+/examples/greencsharp/**/bin/
+obj/
